@@ -49,7 +49,22 @@ async function auth() {
     <p class="auth-foot"><a href="${link('login')}">Entrar</a> · <a href="${link('cadastro')}">Cadastrar</a> · <a href="${link('recuperar')}">Recuperar acesso</a> · <a href="${link('redefinir')}">Redefinir</a></p>`;
   onForm('auth-form',async d=>{if(d.confirm!==undefined && d.confirm!==d.password) throw Error('As senhas não coincidem.');delete d.confirm;const r=await api(cfg[2],'POST',d);if(page==='login'){csrf=r.csrf;location.href=root;return;}notice(r.message||'Operação concluída.');if(r.development_code)notice(`${r.message} Código de demonstração: ${r.development_code}`);});
 }
-const routes={};
+async function dashboard() {
+  const [d,map]=await Promise.all([api('dashboard?period='+state.period),api('map')]);
+  app.innerHTML=head('Visão geral','Acompanhe a operação ferroviária em tempo quase real.',select('Período','period',[['7d','7 dias'],['30d','30 dias'],['90d','90 dias']],state.period))+
+    `<div class="metrics-grid">${[['Trens operando',d.metrics.operating_trains],['Sensores ativos',d.metrics.active_sensors],['Manutenções hoje',d.metrics.maintenances_today],['Alertas ativos',d.metrics.active_alerts]].map(([t,v])=>`<div class="metric-card card"><span>${t}</span><strong>${num(v)}</strong></div>`).join('')}</div>`+
+    `<div class="dashboard-grid">${card('Resumo da frota',`<div class="summary-grid"><div>Distância<br><strong>${num(d.summary.distance_km)} km</strong></div><div>Consumo<br><strong>${num(d.summary.consumption_l)} L</strong></div><div>Pontualidade<br><strong>${num(d.summary.punctuality_pct)}%</strong></div></div><h3>Status da frota</h3>${d.fleet.map(x=>`<p>${statusBadge(x.status)} ${num(x.total)} trens</p>`).join('')}<h3>Leituras no período</h3>${d.trends.length?d.trends.map(x=>`<p>${esc(x.day)}: ${num(x.readings)}</p>`).join(''):empty()}`)}${card('Mapa operacional',mapView(map))}</div>`+
+    `<div class="lower-grid">${card('Próximas manutenções',d.maintenance.map(x=>`<p><strong>${esc(x.train_code)}</strong> ${esc(x.title)} · ${date(x.scheduled_at)}</p>`).join('')||empty())}${card('Alertas recentes',d.alerts.map(x=>`<p>${statusBadge(x.severity)} ${esc(x.title)}</p>`).join('')||empty())}</div>`;
+  app.querySelector('[name=period]').onchange=e=>{state.period=e.target.value;dashboard();};
+}
+function mapView(map) {
+  const xs=[...map.stations,...map.trains].map(x=>Number(x.longitude)).filter(Number.isFinite), ys=[...map.stations,...map.trains].map(x=>Number(x.latitude)).filter(Number.isFinite);
+  const minX=Math.min(...xs)-.15,maxX=Math.max(...xs)+.15,minY=Math.min(...ys)-.15,maxY=Math.max(...ys)+.15;
+  const pos=x=>[40+(Number(x.longitude)-minX)/(maxX-minX)*620,300-(Number(x.latitude)-minY)/(maxY-minY)*260];
+  return `<div class="map-box"><svg viewBox="0 0 700 340" role="img" aria-label="Mapa esquemático de estações e trens"><polyline points="${map.stations.map(x=>pos(x).join(',')).join(' ')}" fill="none" stroke="#ad8bcf" stroke-width="5" stroke-dasharray="8 7"/>${map.stations.map(x=>{const [px,py]=pos(x);return `<g><circle cx="${px}" cy="${py}" r="8" fill="#6b30ad"/><text x="${px+10}" y="${py-10}">${esc(x.name)}</text></g>`}).join('')}${map.trains.filter(x=>x.latitude&&x.longitude).map(x=>{const [px,py]=pos(x);return `<g><circle cx="${px}" cy="${py}" r="6" fill="#f4a340"/><title>${esc(x.code)} · ${esc(x.status)}</title></g>`}).join('')}</svg></div><p class="data-note">Posições baseadas nas coordenadas cadastradas; não representam GPS contínuo.</p>`;
+}
+async function mapPage(){const d=await api('map');app.innerHTML=head('Localização da frota','Mapa esquemático com estações e posições cadastradas.')+card('Mapa ferroviário',mapView(d))+card('Estações e trens',table(['Código','Nome','Status','Estação'],d.trains.map(t=>`<tr><td>${esc(t.code)}</td><td>${esc(t.name)}</td><td>${statusBadge(t.status)}</td><td>${esc(d.stations.find(s=>s.id==t.station_id)?.name||'—')}</td></tr>`)));}
+const routes={dashboard,localizacao:mapPage};
 async function load(){try{if(['login','cadastro','recuperar','redefinir'].includes(page))await auth();else if(routes[page])await routes[page]();else app.innerHTML=head('Página indisponível','Confira o endereço ou suas permissões.');}catch(e){app.innerHTML=head('Não foi possível carregar',e.message);}}
 document.getElementById('logout')?.addEventListener('click',async()=>{try{await api('auth/logout','POST');location.href=link('login')}catch(e){notice(e.message,true)}});
 document.getElementById('menu')?.addEventListener('click',()=>document.getElementById('sidebar').classList.toggle('is-open'));
