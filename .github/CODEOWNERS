@@ -1,0 +1,11 @@
+# Responsáveis por revisão na arquitetura PHP/MySQL.
+* @adrianonascimentojunior
+/.github/ @adrianonascimentojunior
+/app/ @adrianonascimentojunior
+/api/ @adrianonascimentojunior
+/scripts/ @adrianonascimentojunior
+/config/ @adrianonascimentojunior
+/index.php @ErikFelipeDalonso @gabrielmartinsgonzatto
+/database/ @nathanpacheco-boop
+/public/assets/css/ @ErikFelipeDalonso
+/public/assets/js/ @ErikFelipeDalonso @gabrielmartinsgonzatto
