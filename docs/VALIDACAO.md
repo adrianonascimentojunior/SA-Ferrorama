@@ -11,10 +11,11 @@ C:\xampp\php\php.exe -l index.php
 C:\xampp\php\php.exe -l app\api.php
 C:\xampp\php\php.exe -l app\bootstrap.php
 C:\xampp\php\php.exe -l scripts\create_admin.php
-python scripts\validate_local.py
+C:\xampp\php\php.exe -l scripts\validate_local.php
+C:\xampp\php\php.exe scripts\validate_local.php --all
 ```
 
-O teste HTTP usa `ATRAIN_MYSQL_ROOT_PASSWORD` apenas para conferir e limpar registros temporários. Ele percorre cadastro, login, sessão, CSRF, permissões, frota, suporte, notificações, relatórios, simulações, perfil, configurações e administração. Execute em uma instalação local controlada.
+O teste HTTP usa apenas PHP CLI e deve rodar contra um banco descartável com esquema e seed importados. Defina `DB_NAME` para o nome desse banco tanto no processo do servidor HTTP quanto no terminal que executa o teste; o script recusa o banco padrão `frota_ferroviaria`. Configure `ATRAIN_TEST_BASE_URL` com a URL desse servidor, incluindo `/SA-Ferroama/`, e mantenha as credenciais do banco em `config/local.php` ignorado pelo Git. O teste cria e remove contas, trens e sensores temporários; outros registros de auditoria e de fluxos simulados podem permanecer no banco descartável. `--block2` verifica apenas sessão, CSRF, papéis, trens, sensores e saída; `--all` também percorre os endpoints já existentes de suporte, notificações, relatórios, simulação, perfil e administração.
 
 `http://localhost/SA-Ferroama/api/health` deve retornar `{"status":"ok","database":true}`. O acesso direto a `app/`, `config/`, `database/`, `scripts/` e documentação deve retornar HTTP 403.
 

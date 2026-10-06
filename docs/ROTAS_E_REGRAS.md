@@ -41,4 +41,4 @@ Todas as mutações autenticadas exigem CSRF no backend. `operator` e `manager` 
 | Suporte | validação, persistência e confirmação |
 | Administração | usuários, frota, sensores, manutenções, alertas, parâmetros e auditoria |
 
-Veja [VALIDACAO.md](VALIDACAO.md) e `scripts/validate_local.py` para a validação HTTP reproduzível. Pagamentos e integrações de comunicação são simulações.
+Veja [VALIDACAO.md](VALIDACAO.md) e `scripts/validate_local.php` para a validação HTTP reproduzível. Pagamentos e integrações de comunicação são simulações.

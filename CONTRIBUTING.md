@@ -20,7 +20,7 @@ O [CODEOWNERS](.github/CODEOWNERS) traduz essas áreas para os caminhos da arqui
 1. Faça mudanças pequenas e descreva o motivo no commit (`feat:`, `fix:`, `docs:`, `test:` ou `chore:`).
 2. Preserve os contratos da API e valide no servidor as permissões, entradas e operações que alteram dados.
 3. Ao alterar o esquema, mantenha `database/schema.mysql.sql`, `database/seed.mysql.sql` e a documentação de importação compatíveis com MySQL 8.4.
-4. Antes de compartilhar, execute `C:\xampp\php\php.exe -l` nos arquivos PHP alterados e, com Apache/MySQL locais ativos, `python scripts/validate_local.py` para mudanças de comportamento. Verifique `git diff --check` e `git status`.
+4. Antes de compartilhar, execute `C:\xampp\php\php.exe -l` nos arquivos PHP alterados e, com Apache/MySQL locais ativos e um banco de testes isolado, `C:\xampp\php\php.exe scripts/validate_local.php --all` para mudanças de comportamento. Verifique `git diff --check` e `git status`.
 5. Solicite revisão das áreas afetadas conforme `CODEOWNERS`. Preserve o histórico publicado; não use `push --force` na branch compartilhada.
 
 Não adicione senhas, dados pessoais, `config/local.php`, `.env`, caches ou dependências instaladas. Recursos de pagamento e envio de mensagens continuam identificados como simulações até que exista uma integração real.

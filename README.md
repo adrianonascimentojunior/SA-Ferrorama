@@ -43,7 +43,7 @@ Para criar o primeiro Super Admin, defina `ADMIN_EMAIL` e `ADMIN_PASSWORD` (12+ 
 | `scripts/create_admin.php` | Criação controlada do primeiro Super Admin |
 | `config/local.php` | Credenciais locais fora do Git |
 | `database/schema.mysql.sql`, `database/seed.mysql.sql` | Importação pelo phpMyAdmin |
-| `scripts/validate_local.py` | Validação dos fluxos HTTP locais |
+| `scripts/validate_local.php` | Validação dos fluxos HTTP locais em PHP CLI |
 | `docs/` | Arquitetura, rotas, validação e responsabilidades |
 
 O Apache usa o `DocumentRoot` padrão de `htdocs`. `.htaccess` bloqueia acesso direto a `app/`, configuração, SQL, scripts e documentação. A URL funciona no subdiretório `/SA-Ferroama`. [ROTAS_E_REGRAS.md](docs/ROTAS_E_REGRAS.md) relaciona endpoints, páginas e ações. [CONTRIBUTING.md](CONTRIBUTING.md) descreve os papéis da equipe e a revisão de mudanças.
@@ -54,7 +54,7 @@ As páginas consultam a API a cada cinco segundos quando visíveis e sem ediçã
 
 Recuperação de senha exibe o código somente com `APP_ENV=development`. Ele expira em dez minutos e permite cinco tentativas. Entrega real exige integração externa. O mapa é esquemático e usa coordenadas cadastradas, sem GPS contínuo.
 
-`http://localhost/SA-Ferroama/api/health` deve responder `{"status":"ok","database":true}`. Com Apache e MySQL 8.4 ativos, `python scripts/validate_local.py` exercita autenticação, CSRF, papéis, CRUD, suporte, notificações, relatórios, simulação e administração; cria e remove contas temporárias. O teste precisa da variável local `ATRAIN_MYSQL_ROOT_PASSWORD` para consultar e limpar os dados de teste. Consulte [VALIDACAO.md](docs/VALIDACAO.md) para os procedimentos e resultados.
+`http://localhost/SA-Ferroama/api/health` deve responder `{"status":"ok","database":true}`. Com Apache e MySQL 8.4 ativos, `C:\xampp\php\php.exe scripts\validate_local.php --all` exercita autenticação, CSRF, papéis, CRUD, suporte, notificações, relatórios, simulação e administração. `--block2` limita a validação à sessão, saída, trens e sensores. O teste exige `DB_NAME` apontando para um banco isolado com o esquema e os dados iniciais, a mesma configuração no servidor HTTP e `ATRAIN_TEST_BASE_URL` com a URL de teste. Consulte [VALIDACAO.md](docs/VALIDACAO.md) para o procedimento.
 
 ## Equipe e contribuição
 
