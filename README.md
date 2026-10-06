@@ -16,6 +16,20 @@ Apache, PHP 8.2 com `PDO` e `pdo_mysql`, MySQL Server 8.4 e um navegador. Os ass
 
 Para consultar os dados atuais pelo phpMyAdmin nesta máquina, use a conta MySQL `atrain_app` em `127.0.0.1` e abra o banco `frota_ferroviaria`. Essa conta tem permissões de operação nas tabelas necessárias, mas não cria o banco nem importa o esquema. A senha é a da configuração local ignorada pelo Git; não a publique.
 
+## Bloco 2: sessão, trens e sensores
+
+Em uma instalação nova, importe o esquema e os dados iniciais como descrito acima. Em uma instalação existente, importe uma vez [2026-10-06-bloco2.sql](database/migrations/2026-10-06-bloco2.sql) com uma conta administrativa antes de atualizar o código. A migração preserva os trens e sensores atuais; ano e capacidade em toneladas dos trens antigos ficam vazios até a edição, pois a capacidade anterior representa passageiros e não pode ser convertida com segurança. A conta local `atrain_app` tinha apenas `SELECT` e `UPDATE` em `sensors`; execute também como administrador (ajustando banco e conta se forem diferentes):
+
+```sql
+GRANT SELECT, INSERT, UPDATE, DELETE ON frota_ferroviaria.sensors TO 'atrain_app'@'127.0.0.1';
+```
+
+As telas canônicas deste bloco são `trens.php`, `trens_form.php`, `sensores.php`, `sensores_form.php` e `sair.php`. Todas usam a sessão existente. A navegação mostra nome e papel; as telas de gestão exigem `manager` ou `super_admin` também no servidor. Na correspondência com o guia, `operator` é usuário comum, `manager` é gerente e `super_admin` é administrador. O papel de maquinista e a atribuição de um trem a ele ainda não existem nesta base, portanto não se apresenta uma consulta de sensores por maquinista sem uma associação verificável.
+
+O prefixo do trem é único no MySQL e segue `TR-204`; o código do sensor também é único e segue `S-TEMP-001`. Os campos `status` e `reading_indicator` têm valores aceitos definidos por `CHECK` no banco e validados na API. O sensor exige trem existente. A chave estrangeira de sensor para trem usa `ON DELETE RESTRICT`: excluir um trem com sensores é bloqueado com mensagem clara, para não apagar sensores e possíveis leituras históricas. O indicador de última leitura é preenchido manualmente neste bloco.
+
+O logout por `POST` limpa as variáveis, destrói a sessão e expira o cookie de sessão. As respostas das páginas não são armazenadas em cache, de modo que voltar e recarregar exige novo login. O cookie expirado também remove do navegador o identificador de sessão antigo.
+
 Para criar o primeiro Super Admin, defina `ADMIN_EMAIL` e `ADMIN_PASSWORD` (12+ caracteres) no ambiente de uma sessão de terminal e execute `C:\xampp\php\php.exe scripts\create_admin.php`. O script não sobrescreve conta existente. Não grave senhas no repositório.
 
 ## Estrutura
