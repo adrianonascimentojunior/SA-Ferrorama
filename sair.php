@@ -14,8 +14,12 @@ if (!isset($_POST['csrf']) || !is_string($_POST['csrf']) || empty($_SESSION['csr
     http_response_code(403);
     exit('Token CSRF inválido.');
 }
-if (currentUser()) {
-    audit('logout', 'users', (int)$_SESSION['user_id']);
+try {
+    if (currentUser()) {
+        audit('logout', 'users', (int)$_SESSION['user_id']);
+    }
+} catch (Throwable $exception) {
+    error_log($exception->getMessage());
 }
 encerrarSessao();
 header('Location: /SA-Ferroama/index.php?page=login', true, 303);

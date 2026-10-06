@@ -46,7 +46,8 @@ try {
     }
     if ($path === 'auth/logout' && $method === 'POST') {
         requireUser(); csrf();
-        audit('logout', 'users', (int)$_SESSION['user_id']);
+        try { audit('logout', 'users', (int)$_SESSION['user_id']); }
+        catch (Throwable $exception) { error_log($exception->getMessage()); }
         encerrarSessao();
         respond(['message' => 'Sessão encerrada.']);
     }
