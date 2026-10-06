@@ -1,12 +1,9 @@
 <?php
 declare(strict_types=1);
 
-ini_set('session.use_strict_mode', '1');
-ini_set('session.use_only_cookies', '1');
-session_name('ATRAINSESSID');
-session_set_cookie_params(['httponly' => true, 'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'), 'samesite' => 'Lax', 'path' => '/SA-Ferroama/']);
-session_start();
+require_once __DIR__ . '/../includes/sessao.php';
 require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/../includes/permissao.php';
 
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 if ($origin !== '' && $origin !== ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? 'localhost'))) fail('Origem não permitida.', 403);
@@ -50,8 +47,7 @@ try {
     if ($path === 'auth/logout' && $method === 'POST') {
         requireUser(); csrf();
         audit('logout', 'users', (int)$_SESSION['user_id']);
-        $_SESSION = [];
-        session_destroy();
+        encerrarSessao();
         respond(['message' => 'Sessão encerrada.']);
     }
     if ($path === 'auth/forgot' && $method === 'POST') {
