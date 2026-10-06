@@ -104,6 +104,26 @@ function inspectionDate(mixed $value): ?string {
     return $value;
 }
 
+function sensorCode(array $data): string {
+    $code = strtoupper(requiredString($data, 'code', 40));
+    if (!preg_match('/^S-[A-Z]{2,10}-[0-9]{3,}$/', $code)) fail('O código deve seguir o padrão S-TEMP-001.');
+    return $code;
+}
+
+function sensorTrainId(mixed $value): int {
+    $id = filter_var($value, FILTER_VALIDATE_INT);
+    if ($id === false || $id < 1 || !query('SELECT 1 FROM trains WHERE id=?', [$id])->fetchColumn()) {
+        fail('Selecione um trem existente.');
+    }
+    return $id;
+}
+
+function optionalText(mixed $value, string $field, int $max): ?string {
+    if ($value === null || $value === '') return null;
+    if (!is_string($value) || strlen(trim($value)) > $max) fail("Campo inválido: $field.");
+    return trim($value) ?: null;
+}
+
 function csrf(): void {
     $given = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
     if (!is_string($given) || empty($_SESSION['csrf']) || !hash_equals($_SESSION['csrf'], $given)) fail('Token CSRF inválido.', 403);
