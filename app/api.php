@@ -124,6 +124,15 @@ try {
         audit('create','trains',(int)$id,$data);
         respond(['id' => $id],201);
     }
+    if (($segments[0] ?? '') === 'trains' && ctype_digit($segments[1] ?? '') && ($segments[2] ?? '') === 'delete' && count($segments) === 3 && $method === 'POST') {
+        requireManager();
+        $id = (int)$segments[1];
+        if (query('SELECT 1 FROM sensors WHERE train_id=? LIMIT 1', [$id])->fetchColumn()) fail('Remova ou transfira os sensores vinculados antes de excluir o trem.',409);
+        $row = query('DELETE FROM trains WHERE id=?', [$id]);
+        if (!$row->rowCount()) fail('Trem não encontrado.',404);
+        audit('delete','trains',$id);
+        respond(['message'=>'Trem excluído.']);
+    }
     if (($segments[0] ?? '') === 'trains' && ctype_digit($segments[1] ?? '') && count($segments) === 2) {
         $id = (int)$segments[1];
         if ($method === 'GET') {
