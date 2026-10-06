@@ -20,6 +20,7 @@ CREATE TABLE stations (
 CREATE TABLE trains (
  id BIGINT AUTO_INCREMENT PRIMARY KEY, code VARCHAR(32) NOT NULL UNIQUE, name VARCHAR(120) NOT NULL,
  type VARCHAR(20) NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'stopped', capacity INT NOT NULL DEFAULT 0,
+ model_year SMALLINT, capacity_tons DECIMAL(8,2), last_inspection DATE,
  distance_km DECIMAL(12,1) NOT NULL DEFAULT 0, consumption_l DECIMAL(12,1) NOT NULL DEFAULT 0,
  punctuality_pct DECIMAL(5,2) NOT NULL DEFAULT 100, latitude DECIMAL(9,6), longitude DECIMAL(9,6), station_id BIGINT,
  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -27,14 +28,18 @@ CREATE TABLE trains (
  CONSTRAINT trains_type_check CHECK (type IN ('locomotive','composition')),
  CONSTRAINT trains_status_check CHECK (status IN ('operating','maintenance','stopped','inactive')),
  CONSTRAINT trains_capacity_check CHECK (capacity >= 0),
+ CONSTRAINT trains_model_year_check CHECK (model_year IS NULL OR model_year BETWEEN 1900 AND 2100),
+ CONSTRAINT trains_capacity_tons_check CHECK (capacity_tons IS NULL OR capacity_tons > 0),
  CONSTRAINT trains_punctuality_check CHECK (punctuality_pct BETWEEN 0 AND 100)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE sensors (
  id BIGINT AUTO_INCREMENT PRIMARY KEY, train_id BIGINT NOT NULL, code VARCHAR(40) NOT NULL UNIQUE,
  type VARCHAR(40) NOT NULL, unit VARCHAR(20) NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'active',
+ location VARCHAR(80), segment VARCHAR(80), reading_indicator VARCHAR(20) NOT NULL DEFAULT 'normal',
  latest_value DECIMAL(12,2), latest_reading_at TIMESTAMP NULL DEFAULT NULL, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
- FOREIGN KEY (train_id) REFERENCES trains(id) ON DELETE CASCADE,
- CONSTRAINT sensors_status_check CHECK (status IN ('active','warning','offline'))
+ CONSTRAINT fk_sensors_trains FOREIGN KEY (train_id) REFERENCES trains(id) ON DELETE RESTRICT,
+ CONSTRAINT sensors_status_check CHECK (status IN ('active','warning','offline')),
+ CONSTRAINT sensors_reading_indicator_check CHECK (reading_indicator IN ('normal','attention','critical'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE sensor_readings (
  id BIGINT AUTO_INCREMENT PRIMARY KEY, sensor_id BIGINT NOT NULL, value DECIMAL(12,2) NOT NULL,
