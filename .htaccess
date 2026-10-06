@@ -3,6 +3,7 @@ RewriteEngine On
 RewriteRule ^\. - [F,L]
 RewriteRule ^$ - [L]
 RewriteRule ^index\.php$ - [L,NC]
+RewriteRule ^(trens|trens_form|sensores|sensores_form|sair)\.php$ - [L,NC]
 RewriteRule ^api(/|$) - [L,NC]
 RewriteRule ^public/assets(/|$) - [L,NC]
 RewriteRule . - [F,L]
