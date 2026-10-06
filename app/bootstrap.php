@@ -71,6 +71,39 @@ function requireAdmin(): array {
     return $user;
 }
 
+function requireManager(): array {
+    $user = requireUser();
+    if (!in_array($user['role'], ['manager', 'super_admin'], true)) fail('Acesso restrito à gestão de trens e sensores.', 403);
+    return $user;
+}
+
+function trainCode(array $data): string {
+    $code = strtoupper(requiredString($data, 'code', 32));
+    if (!preg_match('/^TR-[0-9]{3,}$/', $code)) fail('O prefixo deve seguir o padrão TR-204.');
+    return $code;
+}
+
+function modelYear(mixed $value): int {
+    $year = filter_var($value, FILTER_VALIDATE_INT);
+    if ($year === false || $year < 1900 || $year > 2100) fail('Informe um ano entre 1900 e 2100.');
+    return $year;
+}
+
+function capacityTons(mixed $value): string {
+    if (!is_scalar($value) || !preg_match('/^\d{1,6}(?:\.\d{1,2})?$/', (string)$value) || (float)$value <= 0) {
+        fail('Informe capacidade em toneladas maior que zero, com até duas casas decimais.');
+    }
+    return (string)$value;
+}
+
+function inspectionDate(mixed $value): ?string {
+    if ($value === null || $value === '') return null;
+    if (!is_string($value) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) fail('Data da última inspeção inválida.');
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+    if (!$date || $date->format('Y-m-d') !== $value) fail('Data da última inspeção inválida.');
+    return $value;
+}
+
 function csrf(): void {
     $given = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
     if (!is_string($given) || empty($_SESSION['csrf']) || !hash_equals($_SESSION['csrf'], $given)) fail('Token CSRF inválido.', 403);
