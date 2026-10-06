@@ -9,16 +9,19 @@ INSERT INTO stations (name,city,latitude,longitude) VALUES
 ('Estação Central','São Paulo',-23.550520,-46.633308),('Campinas','Campinas',-22.905560,-47.060830),
 ('Jundiaí','Jundiaí',-23.186390,-46.884170),('Sorocaba','Sorocaba',-23.501530,-47.452590),
 ('Santos','Santos',-23.960830,-46.333610);
-INSERT INTO trains (code,name,type,status,capacity,distance_km,consumption_l,punctuality_pct,latitude,longitude,station_id) VALUES
-('ATR-101','Expresso Violeta','composition','operating',240,12480,3180,96.8,-23.19,-46.88,3),
-('ATR-102','Linha Horizonte','composition','operating',180,9300,2420,94.2,-22.91,-47.06,2),
-('LOC-203','Atlas Diesel','locomotive','maintenance',0,18700,7100,88.5,-23.50,-47.45,4),
-('LOC-204','Vetor Sul','locomotive','stopped',0,7500,2790,98.1,-23.55,-46.63,1),
-('ATR-105','Costa Azul','composition','inactive',200,11200,3010,91.6,-23.96,-46.33,5);
-INSERT INTO sensors (train_id,code,type,unit,status) VALUES
-(1,'TMP-101','Temperatura','°C','active'),(1,'VIB-101','Vibração','mm/s','active'),
-(2,'TMP-102','Temperatura','°C','warning'),(3,'FRE-203','Freio','bar','warning'),
-(4,'MOT-204','Motor','rpm','offline'),(5,'TMP-105','Temperatura','°C','offline');
+INSERT INTO trains (code,name,type,status,capacity,model_year,capacity_tons,last_inspection,distance_km,consumption_l,punctuality_pct,latitude,longitude,station_id) VALUES
+('TR-204','Expresso Violeta','composition','operating',240,2019,360.00,'2026-08-14',12480,3180,96.8,-23.19,-46.88,3),
+('TR-205','Linha Horizonte','composition','operating',180,2021,290.50,'2026-09-03',9300,2420,94.2,-22.91,-47.06,2),
+('TR-206','Atlas Diesel','locomotive','maintenance',0,2016,120.00,'2026-07-22',18700,7100,88.5,-23.50,-47.45,4),
+('TR-207','Vetor Sul','locomotive','stopped',0,2020,125.00,NULL,7500,2790,98.1,-23.55,-46.63,1),
+('TR-208','Costa Azul','composition','inactive',200,2018,315.00,'2026-06-11',11200,3010,91.6,-23.96,-46.33,5);
+INSERT INTO sensors (train_id,code,type,unit,status,location,segment,reading_indicator) VALUES
+(1,'S-TEMP-001','Temperatura','°C','active','Motor','Jundiaí - São Paulo','normal'),
+(1,'S-VEL-002','Velocidade','km/h','active','Cabine','Jundiaí - São Paulo','normal'),
+(2,'S-TEMP-003','Temperatura','°C','warning','Motor','Campinas - Jundiaí','attention'),
+(3,'S-CONS-004','Consumo','kWh','warning','Compartimento elétrico','Sorocaba - São Paulo','attention'),
+(4,'S-LOC-005','Localização','km','offline','Cabine','São Paulo - Santos','normal'),
+(5,'S-TEMP-006','Temperatura','°C','offline','Motor','São Paulo - Santos','normal');
 INSERT INTO sensor_readings (sensor_id,value) VALUES (1,62.3),(2,2.1),(3,82.4),(4,4.7);
 INSERT INTO maintenances (train_id,title,scheduled_at,status,notes) VALUES
 (3,'Revisão do sistema de freios',UTC_TIMESTAMP() + INTERVAL 3 HOUR,'in_progress','Inspeção preventiva'),
