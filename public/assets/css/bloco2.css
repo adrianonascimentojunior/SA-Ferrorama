@@ -1,0 +1,85 @@
+.inline-form {
+  display: inline;
+}
+
+.danger-link {
+  color: #a5263b;
+}
+
+.management-badge.tone-normal {
+  background: #e5f5ec;
+  color: #176440;
+}
+
+.management-badge.tone-attention {
+  background: #fff3d2;
+  color: #805700;
+}
+
+.management-badge.tone-critical {
+  background: #ffe8e9;
+  color: #a32734;
+}
+
+.management-table td:last-child {
+  white-space: nowrap;
+}
+
+.topbar-right span:nth-child(2) {
+  max-width: 38vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .management-table thead {
+    display: none;
+  }
+
+  .management-table tbody {
+    display: grid;
+    gap: 12px;
+  }
+
+  .management-table tr {
+    display: block;
+    border: 1px solid #e6e8ef;
+    border-radius: 10px;
+    padding: 9px 12px;
+    background: #fff;
+  }
+
+  .management-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    gap: 12px;
+    padding: 9px 0;
+    border: 0;
+    text-align: right;
+  }
+
+  .management-table td + td {
+    border-top: 1px solid #f0f1f5;
+  }
+
+  .management-table td::before {
+    content: attr(data-label);
+    color: #657182;
+    font-weight: 700;
+    text-align: left;
+    flex-shrink: 0;
+  }
+
+  .management-table td:last-child {
+    white-space: normal;
+    flex-wrap: wrap;
+  }
+
+  .topbar-right span:nth-child(2) {
+    max-width: 170px;
+    white-space: normal;
+    line-height: 1.25;
+  }
+}

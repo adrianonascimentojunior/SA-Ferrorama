@@ -23,7 +23,7 @@ $base = '/SA-Ferroama/';
 ?><!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?= h($titles[$page] ?? 'A-Train') ?> · A-Train</title>
-<link rel="stylesheet" href="<?= $base ?>public/assets/css/app.css"><link rel="stylesheet" href="<?= $base ?>public/assets/css/local.css"></head>
+<link rel="stylesheet" href="<?= $base ?>public/assets/css/app.css"><link rel="stylesheet" href="<?= $base ?>public/assets/css/local.css"><link rel="stylesheet" href="<?= $base ?>public/assets/css/bloco2.css"></head>
 <body data-page="<?= h($page) ?>" data-base="<?= h($base) ?>" data-csrf="<?= h($_SESSION['csrf']) ?>" data-user="<?= h(json_encode($user, JSON_UNESCAPED_UNICODE) ?: 'null') ?>">
 <?php if (in_array($page, $authPages, true)): ?>
 <div class="auth-layout"><aside class="auth-aside"><div class="auth-brand">A<span>·</span>TRAIN</div><div class="auth-aside-body"><span class="eyebrow light">INTELIGÊNCIA FERROVIÁRIA</span><h2>Sua operação em movimento.</h2><p>Monitore a frota, acompanhe alertas e planeje viagens em um único lugar.</p><div class="auth-track"><div class="track-line"></div><div class="track-train">🚆</div><div class="track-station a"></div><div class="track-station b"></div><div class="track-station c"></div></div></div><div class="auth-aside-footer">A-Train · SA-Ferrorama</div></aside><main class="auth-main"><div class="auth-card"><a class="auth-mobile-brand" href="<?= $base ?>">🚆 A-TRAIN</a><div class="auth-mini">ACESSO À PLATAFORMA</div><div id="app"></div></div></main></div>
