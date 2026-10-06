@@ -81,6 +81,8 @@ token = session["csrf"]
 assert call(admin, "trens.php")[0] == 200
 assert call(admin, "sensores.php")[0] == 200
 assert call(admin, "api/auth/me")[0] == 200
+for preserved in ("dashboard", "map", "schedules", "notifications", "reports"):
+    expect(call(admin, "api/" + preserved), 200, "preserved " + preserved)
 
 code = "TR-" + str(secrets.randbelow(900000) + 100000)
 train = {"code": code, "name": "Trem de validação", "type": "locomotive", "status": "stopped", "model_year": 2020, "capacity_tons": "135.50", "last_inspection": "2026-09-10"}
