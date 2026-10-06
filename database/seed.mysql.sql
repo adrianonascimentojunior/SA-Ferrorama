@@ -17,10 +17,10 @@ INSERT INTO trains (code,name,type,status,capacity,model_year,capacity_tons,last
 ('TR-208','Costa Azul','composition','inactive',200,2018,315.00,'2026-06-11',11200,3010,91.6,-23.96,-46.33,5);
 INSERT INTO sensors (train_id,code,type,unit,status,location,segment,reading_indicator) VALUES
 (1,'S-TEMP-001','Temperatura','°C','active','Motor','Jundiaí - São Paulo','normal'),
-(1,'S-VEL-002','Velocidade','km/h','active','Cabine','Jundiaí - São Paulo','normal'),
+(1,'S-VIB-002','Vibração','mm/s','active','Eixo dianteiro','Jundiaí - São Paulo','normal'),
 (2,'S-TEMP-003','Temperatura','°C','warning','Motor','Campinas - Jundiaí','attention'),
-(3,'S-CONS-004','Consumo','kWh','warning','Compartimento elétrico','Sorocaba - São Paulo','attention'),
-(4,'S-LOC-005','Localização','km','offline','Cabine','São Paulo - Santos','normal'),
+(3,'S-FRE-004','Freio','bar','warning','Sistema de freios','Sorocaba - São Paulo','attention'),
+(4,'S-MOT-005','Motor','rpm','offline','Motor','São Paulo - Santos','normal'),
 (5,'S-TEMP-006','Temperatura','°C','offline','Motor','São Paulo - Santos','normal');
 INSERT INTO sensor_readings (sensor_id,value) VALUES (1,62.3),(2,2.1),(3,82.4),(4,4.7);
 INSERT INTO maintenances (train_id,title,scheduled_at,status,notes) VALUES
