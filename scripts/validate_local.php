@@ -121,6 +121,7 @@ $adminId = null;
 $operatorId = null;
 $trainId = null;
 $sensorId = null;
+$routeId = null;
 
 try {
     query("INSERT INTO users (name,email,password_hash,role,job_title) VALUES (?,?,?,'super_admin','Administrador de validação')", ['Admin de validação', $adminEmail, password_hash($password, PASSWORD_DEFAULT)]);
@@ -142,8 +143,14 @@ try {
     $operatorCsrf = $operatorSession['csrf'];
     expect($operator->request('trens.php'), 403, 'operador sem tela de gestão de trens');
     expect($operator->request('sensores.php'), 403, 'operador sem tela de gestão de sensores');
+    expect($operator->request('rotas.php'), 403, 'operador sem tela de gestão de rotas');
+    expect($operator->request('simulador.php'), 403, 'operador sem simulador');
+    expect($operator->request('leituras.php'), 200, 'operador pode consultar leituras');
+    expect($operator->request('notificacoes_alertas.php'), 200, 'operador pode consultar alertas');
     expect(api($operator, 'trains', 'POST', [], $operatorCsrf), 403, 'operador sem escrita de trens');
     expect(api($operator, 'sensors', 'POST', [], $operatorCsrf), 403, 'operador sem escrita de sensores');
+    expect(api($operator, 'routes', 'POST', [], $operatorCsrf), 403, 'operador sem escrita de rotas');
+    expect(api($operator, 'simulator', 'POST', [], $operatorCsrf), 403, 'operador sem acesso ao simulador');
     expect(api($operator, 'admin/overview'), 403, 'operador sem painel administrativo');
 
     query("UPDATE users SET role='manager' WHERE id=?", [$operatorId]);
@@ -163,15 +170,49 @@ try {
     expect(api($operator, 'trains/' . $trainId, 'PATCH', ['name' => 'Trem editado'], $operatorCsrf), 200, 'editar trem');
     verify(expect(api($operator, 'trains/' . $trainId), 200, 'reler trem')['name'] === 'Trem editado', 'edição persistida');
 
-    $sensor = ['train_id' => $trainId, 'code' => 'S-TEMP-' . random_int(100000, 999999), 'type' => 'Temperatura', 'unit' => '°C', 'location' => 'Motor', 'segment' => 'Pátio de testes', 'reading_indicator' => 'attention'];
+    $sensor = ['train_id' => $trainId, 'code' => 'S-TEMP-' . random_int(100000, 999999), 'type' => 'Temperatura', 'unit' => '°C', 'location' => 'Motor', 'segment' => 'Pátio de testes'];
     expect(api($operator, 'sensors', 'POST', array_replace($sensor, ['train_id' => 999999999]), $operatorCsrf), 400, 'trem inexistente');
     $sensorId = (int)expect(api($operator, 'sensors', 'POST', $sensor, $operatorCsrf), 201, 'cadastrar sensor')['id'];
     expect(api($operator, 'sensors', 'POST', $sensor, $operatorCsrf), 409, 'código de sensor duplicado');
     expect(api($operator, 'trains/' . $trainId . '/delete', 'POST', null, $operatorCsrf), 409, 'trem vinculado protegido');
     $sensors = expect(api($operator, 'sensors?type=Temperatura'), 200, 'filtro de sensores');
     verify(count(array_filter($sensors, fn($row) => (int)$row['id'] === $sensorId && $row['train_code'] === $code)) === 1, 'sensor mostra prefixo do trem');
-    expect(api($operator, 'sensors/' . $sensorId, 'PATCH', ['reading_indicator' => 'critical', 'location' => 'Cabine'], $operatorCsrf), 200, 'editar sensor');
-    verify(expect(api($operator, 'sensors/' . $sensorId), 200, 'reler sensor')['reading_indicator'] === 'critical', 'edição de sensor persistida');
+    expect(api($operator, 'sensors/' . $sensorId, 'PATCH', ['location' => 'Cabine'], $operatorCsrf), 200, 'editar sensor');
+    $sensorRead = expect(api($operator, 'sensors/' . $sensorId), 200, 'reler sensor');
+    verify($sensorRead['location'] === 'Cabine' && $sensorRead['reading_indicator'] === null, 'sensor editado continua sem leitura');
+    if ($mode === '--all') {
+        expect($operator->request('rotas.php'), 200, 'tela de rotas');
+        expect($operator->request('rotas_form.php'), 200, 'formulário de rota');
+        expect($operator->request('leituras.php'), 200, 'tela de leituras');
+        expect($operator->request('simulador.php'), 200, 'tela do simulador');
+        expect($operator->request('notificacoes_alertas.php'), 200, 'central de alertas');
+        $route = ['train_id'=>$trainId,'origin'=>'Pátio Norte','destination'=>'Pátio Sul','travel_date'=>'2026-10-20','departure_time'=>'08:00','arrival_time'=>'09:30','status'=>'scheduled'];
+        expect(api($operator, 'routes', 'POST', $route), 403, 'rota exige CSRF');
+        expect(api($operator, 'routes', 'POST', array_replace($route,['destination'=>'Pátio Norte']), $operatorCsrf), 400, 'rota rejeita origem igual ao destino');
+        $routeId=(int)expect(api($operator, 'routes', 'POST', $route, $operatorCsrf), 201, 'cadastrar rota')['id'];
+        $filtered=expect(api($operator, 'routes?status=scheduled&from=2026-10-20&to=2026-10-20&train_id='.$trainId.'&q=Sul'), 200, 'quatro filtros combinados');
+        verify(count($filtered)===1 && (int)$filtered[0]['id']===$routeId && $filtered[0]['train_code']===$code, 'rota vinculada ao trem');
+        foreach (['status=cancelled','from=2026-10-21&to=2026-10-22','train_id=999999999','q=Inexistente'] as $filter) {
+            $rows=expect(api($operator, 'routes?'.$filter), 200, 'filtro de rota isolado');
+            verify(count(array_filter($rows, fn($row)=>(int)$row['id']===$routeId))===0, 'filtro exclui rota incompatível');
+        }
+        expect(api($operator, 'routes/'.$routeId, 'PATCH', array_replace($route,['status'=>'completed']), $operatorCsrf), 200, 'editar rota');
+        verify(expect(api($operator, 'routes/'.$routeId), 200, 'reler rota')['status']==='completed', 'edição de rota persistida');
+        expect(api($operator, 'trains/'.$trainId.'/delete', 'POST', null, $operatorCsrf), 409, 'rota impede excluir trem');
+        expect(api($operator, 'simulator', 'POST', ['sensor_id'=>$sensorId,'quantity'=>2,'outside_limit'=>false]), 403, 'simulador exige CSRF');
+        $normal=expect(api($operator, 'simulator', 'POST', ['sensor_id'=>$sensorId,'quantity'=>3,'outside_limit'=>false], $operatorCsrf), 201, 'simular leituras normais');
+        verify($normal['readings']===3 && $normal['alerts']===0, 'leituras normais não geram alerta');
+        $generated=expect(api($operator, 'simulator', 'POST', ['sensor_id'=>$sensorId,'quantity'=>4,'outside_limit'=>true], $operatorCsrf), 201, 'simular acima do limite');
+        verify($generated['readings']===4 && $generated['alerts']===4, 'cada leitura anormal gera alerta');
+        $readings=expect(api($operator, 'readings?sensor_id='.$sensorId.'&train_id='.$trainId), 200, 'filtrar leituras por sensor e trem');
+        verify(count($readings)===7 && $readings[0]['sensor_code']===$sensor['code'] && $readings[0]['train_code']===$code, 'leituras ordenadas e vinculadas');
+        $calculated=expect(api($operator, 'sensors/'.$sensorId), 200, 'indicador calculado');
+        verify($calculated['reading_indicator']==='critical' && $calculated['latest_value']!==null, 'sensor mostra última leitura crítica');
+        $alerts=expect(api($operator, 'operational-alerts?severity=critical&type=Temperatura'), 200, 'filtrar alertas por severidade e tipo');
+        verify(count(array_filter($alerts, fn($row)=>$row['sensor_code']===$sensor['code'] && $row['train_code']===$code))>=1, 'alerta crítico chega ao trem por leitura e sensor');
+        expect(api($operator, 'routes/'.$routeId.'/delete', 'POST', null, $operatorCsrf), 200, 'excluir rota');
+        $routeId=null;
+    }
     expect(api($operator, 'sensors/' . $sensorId . '/delete', 'POST', null, $operatorCsrf), 200, 'excluir sensor');
     $sensorId = null;
     expect(api($operator, 'trains/' . $trainId . '/delete', 'POST', null, $operatorCsrf), 200, 'excluir trem');
@@ -205,6 +246,9 @@ try {
     expect($admin->request('trens.php'), 302, 'voltar à tela interna exige login');
     echo "Validação PHP concluída: $checks verificações ($mode).\n";
 } finally {
+    if ($routeId !== null) {
+        query('DELETE FROM routes WHERE id=?', [$routeId]);
+    }
     if ($sensorId !== null) {
         query('DELETE FROM sensors WHERE id=?', [$sensorId]);
     }
