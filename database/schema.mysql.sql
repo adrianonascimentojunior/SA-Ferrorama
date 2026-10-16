@@ -41,12 +41,23 @@ CREATE TABLE sensors (
  CONSTRAINT sensors_status_check CHECK (status IN ('active','warning','offline')),
  CONSTRAINT sensors_reading_indicator_check CHECK (reading_indicator IN ('normal','attention','critical'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE routes (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY, train_id BIGINT NOT NULL, origin VARCHAR(80) NOT NULL,
+ destination VARCHAR(80) NOT NULL, travel_date DATE NOT NULL, departure_time TIME NOT NULL,
+ arrival_time TIME NULL, status VARCHAR(20) NOT NULL DEFAULT 'scheduled',
+ CONSTRAINT fk_routes_trains FOREIGN KEY (train_id) REFERENCES trains(id) ON DELETE RESTRICT,
+ INDEX routes_date_idx (travel_date, departure_time),
+ CONSTRAINT routes_status_check CHECK (status IN ('scheduled','in_progress','completed','cancelled')),
+ CONSTRAINT routes_stations_check CHECK (origin <> destination),
+ CONSTRAINT routes_time_check CHECK (arrival_time IS NULL OR arrival_time > departure_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE sensor_readings (
- id BIGINT AUTO_INCREMENT PRIMARY KEY, sensor_id BIGINT NOT NULL, value DECIMAL(12,2) NOT NULL,
+ id BIGINT AUTO_INCREMENT PRIMARY KEY, sensor_id BIGINT NOT NULL, value DECIMAL(12,2) NOT NULL, unit VARCHAR(20) NOT NULL,
  recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, source VARCHAR(20) NOT NULL DEFAULT 'device', actor_id BIGINT,
  FOREIGN KEY (sensor_id) REFERENCES sensors(id) ON DELETE CASCADE,
  FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE SET NULL,
  INDEX sensor_readings_time_idx (sensor_id, recorded_at, id),
+ INDEX sensor_readings_recorded_idx (recorded_at, id),
  CONSTRAINT sensor_readings_source_check CHECK (source IN ('device','admin'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE maintenances (
@@ -56,11 +67,13 @@ CREATE TABLE maintenances (
  CONSTRAINT maintenances_status_check CHECK (status IN ('pending','in_progress','completed','cancelled'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE alerts (
- id BIGINT AUTO_INCREMENT PRIMARY KEY, train_id BIGINT, sensor_id BIGINT, title VARCHAR(180) NOT NULL,
+ id BIGINT AUTO_INCREMENT PRIMARY KEY, train_id BIGINT, sensor_id BIGINT, reading_id BIGINT NULL, sensor_type VARCHAR(40) NULL, title VARCHAR(180) NOT NULL,
  message TEXT NOT NULL, severity VARCHAR(20) NOT NULL DEFAULT 'info', status VARCHAR(20) NOT NULL DEFAULT 'active',
  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, resolved_at TIMESTAMP NULL DEFAULT NULL,
  FOREIGN KEY (train_id) REFERENCES trains(id) ON DELETE SET NULL,
  FOREIGN KEY (sensor_id) REFERENCES sensors(id) ON DELETE SET NULL,
+ CONSTRAINT fk_alerts_readings FOREIGN KEY (reading_id) REFERENCES sensor_readings(id) ON DELETE CASCADE,
+ INDEX alerts_reading_idx (reading_id),
  CONSTRAINT alerts_severity_check CHECK (severity IN ('critical','warning','info','system')),
  CONSTRAINT alerts_status_check CHECK (status IN ('active','resolved'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
