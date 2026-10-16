@@ -6,6 +6,13 @@
 /scripts/ @adrianonascimentojunior
 /config/ @adrianonascimentojunior
 /index.php @ErikFelipeDalonso @gabrielmartinsgonzatto
+/includes/cabecalho.php @ErikFelipeDalonso @gabrielmartinsgonzatto
+/rotas.php @ErikFelipeDalonso @gabrielmartinsgonzatto
+/rotas_form.php @ErikFelipeDalonso @gabrielmartinsgonzatto
+/leituras.php @ErikFelipeDalonso @gabrielmartinsgonzatto
+/simulador.php @ErikFelipeDalonso @gabrielmartinsgonzatto
+/notificacoes_alertas.php @ErikFelipeDalonso @gabrielmartinsgonzatto
+/includes/limites.php @adrianonascimentojunior @nathanpacheco-boop
 /database/ @nathanpacheco-boop
 /public/assets/css/ @ErikFelipeDalonso
 /public/assets/js/ @ErikFelipeDalonso @gabrielmartinsgonzatto

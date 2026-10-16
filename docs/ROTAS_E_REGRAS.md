@@ -1,6 +1,6 @@
 # Rotas e regras de negócio
 
-A API está em `app/api.php` e usa as funções de conexão, autenticação e validação de `app/bootstrap.php`. As páginas PHP e o JavaScript em `public/assets/` usam a mesma sessão. O esquema MySQL define 15 tabelas.
+A API está em `app/api.php` e usa as funções de conexão, autenticação e validação de `app/bootstrap.php`. As páginas PHP e o JavaScript em `public/assets/` usam a mesma sessão. O esquema MySQL define 16 tabelas.
 
 | Método e rota da API | Página/ação na interface atual | Regra/persistência |
 | --- | --- | --- |
@@ -10,6 +10,9 @@ A API está em `app/api.php` e usa as funções de conexão, autenticação e va
 | `POST /auth/forgot`, `POST /auth/reset` | recuperar/redefinir | código com hash, 10 min, cinco tentativas |
 | `GET /dashboard?period=` | dashboard | métricas, frota, tendências, alertas e manutenção |
 | `GET/POST /trains`, `GET/PATCH/DELETE /trains/{id}` | frota, formulário, detalhes e exclusão | pesquisa, filtros, validações, auditoria |
+| `GET/POST /routes`, `GET/PATCH /routes/{id}`, `POST /routes/{id}/delete` | rotas e viagens | quatro filtros, validação, vínculo com trem e auditoria |
+| `GET /readings`, `POST /simulator` | leituras e simulador | dois filtros, limite de 100, faixa por tipo e gravação transacional |
+| `GET /operational-alerts`, `GET /sensor-profiles` | central de alertas e simulador | filtros por severidade/tipo e perfis de classificação |
 | `GET /map` | dashboard, mapa e bilhetes | estações, trens e coordenadas |
 | `GET /schedules` | horários e filtros | apenas saídas futuras |
 | `POST /tickets/simulate` | simular passagem | ida/volta válidas, 1–8 passageiros, total salvo; sem compra |
@@ -25,7 +28,7 @@ A API está em `app/api.php` e usa as funções de conexão, autenticação e va
 | `GET/PATCH /admin/settings` | configurações admin | quatro chaves permitidas, limites e auditoria |
 | `PATCH /admin/{users,trains,sensors,maintenances,alerts}/{id}` | editores admin | campos permitidos, enums, leitura/alerta crítico e auditoria |
 
-Todas as mutações autenticadas exigem CSRF no backend. `operator` e `manager` podem usar operações comuns; `super_admin` pode usar a administração. O modo de manutenção bloqueia acesso operacional não administrativo. Leituras de sensores sincronizam o valor materializado por três gatilhos SQL; a interface consulta novamente os dados a cada cinco segundos quando visível e sem edição ativa.
+Todas as mutações autenticadas exigem CSRF no backend. Rotas e simulador exigem `manager` ou `super_admin`; leituras e alertas podem ser consultados por qualquer usuário autenticado. O modo de manutenção bloqueia acesso operacional não administrativo. Leituras de sensores sincronizam o valor materializado por três gatilhos SQL; a tela calcula a última leitura diretamente do histórico e classifica com `includes/limites.php`. A interface consulta novamente os dados a cada cinco segundos quando visível e sem edição ativa.
 
 ## Checklist de interface
 

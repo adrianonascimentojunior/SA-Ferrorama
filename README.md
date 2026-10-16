@@ -10,7 +10,7 @@ Apache, PHP 8.2 com `PDO` e `pdo_mysql`, MySQL Server 8.4 e um navegador. Os ass
 
 1. Confirme a instalação do XAMPP e o caminho real de `htdocs`. Nesta máquina são `C:\xampp` e `C:\xampp\htdocs`. Copie o conteúdo do projeto para `C:\xampp\htdocs\SA-Ferroama`, sem criar uma pasta aninhada.
 2. Inicie **Apache** no XAMPP e o serviço Windows **MySQL_A_TRAIN** (MySQL Community Server 8.4.9, `127.0.0.1:3306`). Confirme as extensões PHP `PDO` e `pdo_mysql` com `C:\xampp\php\php.exe -m`.
-3. Em `http://localhost/phpmyadmin`, conecte-se ao MySQL em `127.0.0.1` com uma conta administrativa para instalar o banco. Crie `frota_ferroviaria` com charset `utf8mb4` e collation `utf8mb4_unicode_ci`, e importe [schema.mysql.sql](database/schema.mysql.sql) seguido de [seed.mysql.sql](database/seed.mysql.sql) em banco vazio. O esquema da aplicação tem **15 tabelas**.
+3. Em `http://localhost/phpmyadmin`, conecte-se ao MySQL em `127.0.0.1` com uma conta administrativa para instalar o banco. Crie `frota_ferroviaria` com charset `utf8mb4` e collation `utf8mb4_unicode_ci`, e importe [schema.mysql.sql](database/schema.mysql.sql) seguido de [seed.mysql.sql](database/seed.mysql.sql) em banco vazio. O esquema da aplicação tem **16 tabelas**.
 4. Copie [local.example.php](config/local.example.php) para `config/local.php` e ajuste host, porta, usuário e senha do MySQL. `local.php` é ignorado pelo Git e bloqueado por HTTP. Nesta máquina a aplicação usa a conta local `atrain_app` com permissões limitadas às tabelas necessárias; não grave credenciais no repositório.
 5. Abra `http://localhost/SA-Ferroama/`. O primeiro acesso vai ao login; cadastros públicos recebem o papel `operator`.
 
@@ -26,7 +26,25 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON frota_ferroviaria.sensors TO 'atrain_app
 
 As telas canônicas deste bloco são `trens.php`, `trens_form.php`, `sensores.php`, `sensores_form.php` e `sair.php`. Todas usam a sessão existente. A navegação mostra nome e papel; as telas de gestão exigem `manager` ou `super_admin` também no servidor. Na correspondência com o guia, `operator` é usuário comum, `manager` é gerente e `super_admin` é administrador. O papel de maquinista e a atribuição de um trem a ele ainda não existem nesta base, portanto não se apresenta uma consulta de sensores por maquinista sem uma associação verificável.
 
-O prefixo do trem é único no MySQL e segue `TR-204`; o código do sensor também é único e segue `S-TEMP-001`. Os campos `status` e `reading_indicator` têm valores aceitos definidos por `CHECK` no banco e validados na API. O sensor exige trem existente. A chave estrangeira de sensor para trem usa `ON DELETE RESTRICT`: excluir um trem com sensores é bloqueado com mensagem clara, para não apagar sensores e possíveis leituras históricas. O indicador de última leitura é preenchido manualmente neste bloco.
+O prefixo do trem é único no MySQL e segue `TR-204`; o código do sensor também é único e segue `S-TEMP-001`. O sensor exige trem existente. A chave estrangeira de sensor para trem usa `ON DELETE RESTRICT`: excluir um trem com sensores é bloqueado com mensagem clara, para não apagar sensores e possíveis leituras históricas. No Bloco 2, o indicador de última leitura era preenchido manualmente; o Bloco 3 o calcula a partir da leitura mais recente.
+
+## Bloco 3: rotas, leituras e alertas
+
+Em um banco existente que já recebeu a migração do Bloco 2, importe uma vez [2026-10-16-bloco3.sql](database/migrations/2026-10-16-bloco3.sql) com uma conta administrativa **antes** de usar o código novo. Para banco vazio, importe apenas o esquema e o seed atuais. Se a conta da aplicação tiver permissões específicas por tabela, garanta `SELECT, INSERT, UPDATE, DELETE` em `routes`, `SELECT, INSERT` em `sensor_readings` e `SELECT, INSERT, UPDATE` em `alerts`, além das permissões já existentes. O simulador é limitado a 100 leituras por pedido e exige papel `manager` ou `super_admin`.
+
+As telas deste bloco são `rotas.php`, `rotas_form.php`, `leituras.php`, `simulador.php` e `notificacoes_alertas.php`. Rotas incluem as viagens programadas e filtram por status, intervalo de datas, trem e texto de origem ou destino. Leituras filtram por sensor e trem e exibem no máximo 100 linhas. A central filtra alertas gerados por leitura por severidade e tipo de sensor. Sensores sem leitura exibem “Sem leitura”.
+
+### Decisões de modelagem
+
+| Decisão | Escolha e motivo |
+| --- | --- |
+| Data e hora da rota | `DATE` e `TIME` separados facilitam o filtro por dia. Chegada informada deve ser posterior à partida no mesmo dia; viagem que atravessa a meia-noite exigiria ampliar o modelo. |
+| Formato da leitura | Um valor numérico e sua unidade por leitura permitem novos tipos de sensor sem adicionar colunas; comparações entre medidas diferentes exigem consultar o tipo do sensor. A unidade histórica permanece correta se o cadastro mudar. |
+| Local dos limites | [limites.php](includes/limites.php) concentra faixas e limites usados pelo simulador e pela classificação. Ajustar limites exige alterar o código e publicar a mudança. Tipos sem perfil não podem ser simulados. |
+| Severidade | Até o limite é normal; acima dele até 10% é atenção; mais de 10% é crítico. Normal não gera alerta. A opção “acima do limite” garante uma leitura crítica por execução para demonstrar a regra. |
+| Alertas e notificações | A tabela `alerts` existente concentra os fatos detectados; `notification_reads` registra quais usuários leram cada aviso. Alertas novos apontam para a leitura de origem; alertas antigos sem leitura vinculada permanecem nas telas legadas. Não há entrega externa de avisos. |
+
+`routes.train_id` usa `ON DELETE RESTRICT`: remova ou transfira as rotas antes de excluir o trem. `sensor_readings.sensor_id` usa `ON DELETE CASCADE`; os novos alertas ligados a `reading_id` também usam `ON DELETE CASCADE`, de modo que excluir leitura ou sensor apaga seus alertas derivados. Os alertas legados continuam com `sensor_id ON DELETE SET NULL`. Leitura e alerta são gravados na mesma transação. Índices em `(sensor_id, recorded_at, id)` e `(recorded_at, id)` sustentam os filtros e a ordenação das leituras sem carregar o histórico inteiro. O campo legado `sensors.reading_indicator` permanece no banco por compatibilidade, mas a API e a tela calculam o indicador da leitura mais recente.
 
 O logout por `POST` limpa as variáveis, destrói a sessão e expira o cookie de sessão. As respostas das páginas não são armazenadas em cache, de modo que voltar e recarregar exige novo login. O cookie expirado também remove do navegador o identificador de sessão antigo.
 
