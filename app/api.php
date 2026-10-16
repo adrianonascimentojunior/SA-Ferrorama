@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/sessao.php';
 require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/bloco3.php';
 require_once __DIR__ . '/../includes/permissao.php';
 
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -85,6 +86,7 @@ try {
     $user = requireUser();
     if (!in_array($method, ['GET', 'HEAD'], true)) csrf();
     if ($user['role'] !== 'super_admin' && query("SELECT value FROM app_settings WHERE `key`='maintenance_mode'")->fetchColumn() === 'true') fail('Plataforma em manutenção. Tente novamente em instantes.', 503);
+    bloco3($path, $method, $user);
 
     if ($path === 'dashboard' && $method === 'GET') {
         $period = enumValue($_GET['period'] ?? '30d', ['7d','30d','90d'], 'period');
@@ -129,6 +131,7 @@ try {
         requireManager();
         $id = (int)$segments[1];
         if (query('SELECT 1 FROM sensors WHERE train_id=? LIMIT 1', [$id])->fetchColumn()) fail('Remova ou transfira os sensores vinculados antes de excluir o trem.',409);
+        if (query('SELECT 1 FROM routes WHERE train_id=? LIMIT 1', [$id])->fetchColumn()) fail('Remova ou transfira as rotas vinculadas antes de excluir o trem.',409);
         $row = query('DELETE FROM trains WHERE id=?', [$id]);
         if (!$row->rowCount()) fail('Trem não encontrado.',404);
         audit('delete','trains',$id);
@@ -171,6 +174,7 @@ try {
         if ($method === 'DELETE') {
             requireManager();
             if (query('SELECT 1 FROM sensors WHERE train_id=? LIMIT 1', [$id])->fetchColumn()) fail('Remova ou transfira os sensores vinculados antes de excluir o trem.',409);
+            if (query('SELECT 1 FROM routes WHERE train_id=? LIMIT 1', [$id])->fetchColumn()) fail('Remova ou transfira as rotas vinculadas antes de excluir o trem.',409);
             $row=query('DELETE FROM trains WHERE id=?',[$id]);
             if (!$row->rowCount()) fail('Trem não encontrado.',404);
             audit('delete','trains',$id);respond(['message'=>'Trem excluído.']);
@@ -231,10 +235,10 @@ try {
     if ($path === 'sensors' && $method === 'GET') {
         $type = trim((string)($_GET['type'] ?? ''));
         if (strlen($type) > 40) fail('Filtro de tipo inválido.');
-        $sql = 'SELECT s.*,t.code AS train_code,t.name AS train_name FROM sensors s JOIN trains t ON t.id=s.train_id';
+        $sql = sensorSelect();
         $params = [];
         if ($type !== '') { $sql .= ' WHERE s.type=?'; $params[] = $type; }
-        respond(query($sql . ' ORDER BY t.code,s.code', $params)->fetchAll());
+        respond(array_map('indicadorCalculado', query($sql . ' ORDER BY t.code,s.code', $params)->fetchAll()));
     }
     if ($path === 'sensors' && $method === 'POST') {
         requireManager();
@@ -246,9 +250,8 @@ try {
         $status = enumValue($data['status'] ?? 'active',['active','warning','offline'],'status');
         $location = optionalText($data['location'] ?? null,'location',80);
         $segment = optionalText($data['segment'] ?? null,'segment',80);
-        $indicator = enumValue($data['reading_indicator'] ?? 'normal',['normal','attention','critical'],'reading_indicator');
         if (query('SELECT 1 FROM sensors WHERE code=?', [$code])->fetchColumn()) fail('Código de sensor já cadastrado.',409);
-        query('INSERT INTO sensors (train_id,code,type,unit,status,location,segment,reading_indicator) VALUES (?,?,?,?,?,?,?,?)',[$trainId,$code,$type,$unit,$status,$location,$segment,$indicator]);
+        query('INSERT INTO sensors (train_id,code,type,unit,status,location,segment) VALUES (?,?,?,?,?,?,?)',[$trainId,$code,$type,$unit,$status,$location,$segment]);
         $id = db()->lastInsertId();
         audit('create','sensors',(int)$id,$data);
         respond(['id'=>$id],201);
@@ -256,15 +259,15 @@ try {
     if (($segments[0] ?? '') === 'sensors' && ctype_digit($segments[1] ?? '') && count($segments) === 2) {
         $id = (int)$segments[1];
         if ($method === 'GET') {
-            $sensor = query('SELECT s.*,t.code AS train_code,t.name AS train_name FROM sensors s JOIN trains t ON t.id=s.train_id WHERE s.id=?',[$id])->fetch();
+            $sensor = query(sensorSelect().' WHERE s.id=?',[$id])->fetch();
             if (!$sensor) fail('Sensor não encontrado.',404);
-            respond($sensor);
+            respond(indicadorCalculado($sensor));
         }
         if ($method === 'PATCH') {
             requireManager();
             $data = body();
             $fields = [];$params = [];
-            foreach (['train_id','code','type','unit','status','location','segment','reading_indicator'] as $key) if (array_key_exists($key,$data)) {
+            foreach (['train_id','code','type','unit','status','location','segment'] as $key) if (array_key_exists($key,$data)) {
                 $value = $data[$key];
                 if ($key === 'train_id') $value = sensorTrainId($value);
                 if ($key === 'code') {
@@ -275,7 +278,6 @@ try {
                 if ($key === 'unit') $value = requiredString($data,$key,20);
                 if ($key === 'status') $value = enumValue($value,['active','warning','offline'],$key);
                 if (in_array($key,['location','segment'],true)) $value = optionalText($value,$key,80);
-                if ($key === 'reading_indicator') $value = enumValue($value,['normal','attention','critical'],$key);
                 $fields[] = "$key=?";$params[] = $value;
             }
             if (!$fields) fail('Nenhum campo válido.');
@@ -343,9 +345,9 @@ try {
         if ($path === 'admin/settings') {
             if ($method === 'GET') respond(query('SELECT * FROM app_settings ORDER BY `key`')->fetchAll());
             if ($method === 'PATCH') {
-                $data=body();$key=enumValue($data['key']??'',['db_statement_timeout_ms','alert_retention_days','maintenance_mode','critical_temperature_c'],'key');$value=(string)($data['value']??'');
+                $data=body();$key=enumValue($data['key']??'',['db_statement_timeout_ms','alert_retention_days','maintenance_mode'],'key');$value=(string)($data['value']??'');
                 if ($key==='maintenance_mode') $value=enumValue($value,['true','false'],'value');
-                else {if (!ctype_digit($value)) fail('Valor numérico inválido.');$number=(int)$value;$bounds=['db_statement_timeout_ms'=>[1000,30000],'alert_retention_days'=>[7,3650],'critical_temperature_c'=>[40,150]];[$min,$max]=$bounds[$key];if ($number<$min || $number>$max) fail("Valor permitido: $min a $max.");$value=(string)$number;}
+                else {if (!ctype_digit($value)) fail('Valor numérico inválido.');$number=(int)$value;$bounds=['db_statement_timeout_ms'=>[1000,30000],'alert_retention_days'=>[7,3650]];[$min,$max]=$bounds[$key];if ($number<$min || $number>$max) fail("Valor permitido: $min a $max.");$value=(string)$number;}
                 query('UPDATE app_settings SET value=? WHERE `key`=?',[$value,$key]);audit('update_setting','app_settings',null,['key'=>$key,'value'=>$value]);respond(['message'=>'Configuração salva.']);
             }
         }
@@ -354,7 +356,7 @@ try {
             $allowed=[
                 'users'=>['name','job_title','role','status'],
                 'trains'=>['name','status','capacity','latitude','longitude','station_id'],
-                'sensors'=>['status','latest_value'],
+                'sensors'=>['status'],
                 'maintenances'=>['status','notes','scheduled_at'],
                 'alerts'=>['status','severity','message']
             ];
@@ -373,19 +375,12 @@ try {
             }
             if (!$fields) fail('Nenhum campo permitido.');
             if ($entity==='users' && $id===(int)$user['id'] && (($data['role']??'super_admin')!=='super_admin' || ($data['status']??'active')!=='active')) fail('Não é possível retirar o próprio acesso administrativo.',409);
-            if ($entity==='sensors' && array_key_exists('latest_value',$data)) $fields[]='latest_reading_at=UTC_TIMESTAMP()';
             if ($entity==='alerts' && ($data['status']??null)==='resolved') $fields[]='resolved_at=UTC_TIMESTAMP()';
             if (in_array($entity,['users','trains','sensors','maintenances'],true)) $fields[]='updated_at=UTC_TIMESTAMP()';
             $params[]=$id;
             db()->beginTransaction();
             $row=query('UPDATE '.$entity.' SET '.implode(',',$fields).' WHERE id=?',$params);
             if (!$row->rowCount() && !query('SELECT 1 FROM '.$entity.' WHERE id=?',[$id])->fetchColumn()) fail('Registro não encontrado.',404);
-            if ($entity==='sensors' && array_key_exists('latest_value',$data) && $data['latest_value']!==null) {
-                query('INSERT INTO sensor_readings (sensor_id,value,source,actor_id) VALUES (?,?,\'admin\',?)',[$id,$data['latest_value'],$user['id']]);
-                $sensor=query('SELECT train_id,code,type FROM sensors WHERE id=?',[$id])->fetch();
-                $threshold=(float)(query("SELECT value FROM app_settings WHERE `key`='critical_temperature_c'")->fetchColumn() ?: 85);
-                if ($sensor['type']==='Temperatura' && (float)$data['latest_value'] >= $threshold) query("INSERT INTO alerts (train_id,sensor_id,title,message,severity) VALUES (?,?,? ,?,'critical')",[$sensor['train_id'],$id,'Temperatura crítica','Leitura manual de '.$sensor['code'].' acima do limite configurado.']);
-            }
             audit('admin_update',$entity,$id,$data);
             db()->commit();
             respond(['message'=>'Registro atualizado.']);
