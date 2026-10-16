@@ -1,0 +1,18 @@
+.alert-emphasis {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.alert-emphasis.critical {
+  background: #ffe0e2;
+  border: 2px solid #b42336;
+  box-shadow: 0 0 0 3px #fff0f1;
+}
+
+@media (max-width: 700px) {
+  .alert-emphasis.critical {
+    margin: 2px 0;
+  }
+}

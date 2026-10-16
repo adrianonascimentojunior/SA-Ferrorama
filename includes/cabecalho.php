@@ -2,10 +2,10 @@
 declare(strict_types=1);
 ?>
 <aside class="sidebar" id="sidebar"><a class="brand" href="<?= $base ?>"><span class="brand-mark">🚆</span><span>A<span>·</span>TRAIN</span></a><nav class="side-nav" aria-label="Navegação principal">
-<?php foreach (['dashboard'=>'⌂','trens'=>'🚆','sensores'=>'◉','alertas'=>'⚡','localizacao'=>'⌖','bilhetes'=>'◷','relatorios'=>'▤','notificacoes'=>'♧','usuarios'=>'♧','admin'=>'◎','configuracoes'=>'⚙','ajuda'=>'?'] as $key=>$icon):
-    if (in_array($key, ['trens','sensores'], true) && !podeGerenciarCadastros()) continue;
+<?php foreach (['dashboard'=>'⌂','trens'=>'🚆','sensores'=>'◉','rotas'=>'⇄','leituras'=>'▥','simulador'=>'▶','notificacoes_alertas'=>'⚡','alertas'=>'⚡','localizacao'=>'⌖','bilhetes'=>'◷','relatorios'=>'▤','notificacoes'=>'♧','usuarios'=>'♧','admin'=>'◎','configuracoes'=>'⚙','ajuda'=>'?'] as $key=>$icon):
+    if (in_array($key, ['trens','sensores','rotas','simulador'], true) && !podeGerenciarCadastros()) continue;
     if (in_array($key, ['usuarios','admin'], true) && !temPapel(['super_admin'])) continue;
-    $href = in_array($key, ['trens','sensores'], true) ? $base . $key . '.php' : $base . 'index.php?page=' . $key;
+    $href = in_array($key, ['trens','sensores','rotas','leituras','simulador','notificacoes_alertas'], true) ? $base . $key . '.php' : $base . 'index.php?page=' . $key;
 ?>
 <a class="side-link <?= $page===$key || $page===$key.'_form'?'active':'' ?>" href="<?= h($href) ?>"><span><?= $icon ?></span><?= h($titles[$key]) ?></a>
 <?php endforeach; ?></nav><div class="side-bottom"><a class="side-link" href="<?= $base ?>index.php?page=perfil">◯ Perfil</a><form method="post" action="<?= $base ?>sair.php"><input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>"><button class="side-logout" type="submit">Sair da conta</button></form></div></aside>
