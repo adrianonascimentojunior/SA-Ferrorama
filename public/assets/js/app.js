@@ -67,7 +67,14 @@ function mapView(map) {
   const pos=x=>[40+(Number(x.longitude)-minX)/(maxX-minX)*620,300-(Number(x.latitude)-minY)/(maxY-minY)*260];
   return `<div class="map-box"><svg viewBox="0 0 700 340" role="img" aria-label="Mapa esquemático de estações e trens"><polyline points="${map.stations.map(x=>pos(x).join(',')).join(' ')}" fill="none" stroke="#ad8bcf" stroke-width="5" stroke-dasharray="8 7"/>${map.stations.map(x=>{const [px,py]=pos(x);return `<g><circle cx="${px}" cy="${py}" r="8" fill="#6b30ad"/><text x="${px+10}" y="${py-10}">${esc(x.name)}</text></g>`}).join('')}${map.trains.filter(x=>x.latitude&&x.longitude).map(x=>{const [px,py]=pos(x);return `<g><circle cx="${px}" cy="${py}" r="6" fill="#f4a340"/><title>${esc(x.code)} · ${esc(x.status)}</title></g>`}).join('')}</svg></div><p class="data-note">Posições baseadas nas coordenadas cadastradas; não representam GPS contínuo.</p>`;
 }
-async function mapPage(){const d=await api('map');app.innerHTML=head('Localização da frota','Mapa esquemático com estações e posições cadastradas.')+card('Mapa ferroviário',mapView(d))+card('Estações e trens',table(['Código','Nome','Status','Estação'],d.trains.map(t=>`<tr><td>${esc(t.code)}</td><td>${esc(t.name)}</td><td>${statusBadge(t.status)}</td><td>${esc(d.stations.find(s=>s.id==t.station_id)?.name||'—')}</td></tr>`)));}
+async function mapPage() {
+  const d = await api('map');
+  app.innerHTML = head('Localização da frota', 'Mapa esquemático com estações e posições cadastradas.') +
+    card('Mapa ferroviário', mapView(d)) +
+    card('Estações e trens', table(['Código', 'Nome', 'Status', 'Estação'], d.trains.map(t =>
+      `<tr><td>${esc(t.code)}</td><td>${esc(t.name)}</td><td>${statusBadge(t.status)}</td><td>${esc(d.stations.find(s=>s.id==t.station_id)?.name||'—')}</td></tr>`
+    )));
+}
 async function trains() {
   const keepSearch = document.activeElement?.name === 'q';
   const d=await api('trains?q='+encodeURIComponent(state.trainQ)+'&status='+encodeURIComponent(state.trainStatus));
@@ -78,14 +85,43 @@ async function trains() {
     t.capacity_tons==null?'—':esc(t.capacity_tons),esc(t.last_inspection||'—'),esc(t.sensor_count),
     `<button class="text-link" data-view="${t.id}">Detalhes</button> <a class="text-link" href="${root}trens_form.php?id=${t.id}">Editar</a> <form class="inline-form" data-delete="${t.id}"><button type="submit" class="text-link danger-link">Excluir</button></form>`
   ])))+`<div id="train-panel"></div>`;
-  if (keepSearch) { const search=app.querySelector('[name=q]'); search.focus(); search.setSelectionRange(search.value.length,search.value.length); }
-  app.querySelector('[name=q]').oninput=e=>{state.trainQ=e.target.value;clearTimeout(state.searchTimer);state.searchTimer=setTimeout(trains,350)};
-  app.querySelector('[name=status]').onchange=e=>{state.trainStatus=e.target.value;trains()};
-  app.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{state.detailId=b.dataset.view;showTrainDetail(b.dataset.view)});
-  app.querySelectorAll('[data-delete]').forEach(form=>form.onsubmit=async e=>{e.preventDefault();if(!confirm('Confirma a exclusão deste trem?'))return;try{await api('trains/'+form.dataset.delete+'/delete','POST');if(state.detailId==form.dataset.delete)state.detailId=null;await trains();notice('Trem excluído.')}catch(error){notice(error.message,true)}});
-  if(state.detailId) await showTrainDetail(state.detailId);
+  if (keepSearch) {
+    const search = app.querySelector('[name=q]');
+    search.focus();
+    search.setSelectionRange(search.value.length, search.value.length);
+  }
+  app.querySelector('[name=q]').oninput = e => {
+    state.trainQ = e.target.value;
+    clearTimeout(state.searchTimer);
+    state.searchTimer = setTimeout(trains, 350);
+  };
+  app.querySelector('[name=status]').onchange = e => { state.trainStatus = e.target.value; trains(); };
+  app.querySelectorAll('[data-view]').forEach(b => b.onclick = () => {
+    state.detailId = b.dataset.view;
+    showTrainDetail(b.dataset.view);
+  });
+  app.querySelectorAll('[data-delete]').forEach(form => form.onsubmit = async e => {
+    e.preventDefault();
+    if (!confirm('Confirma a exclusão deste trem?')) return;
+    try {
+      await api('trains/'+form.dataset.delete+'/delete', 'POST');
+      if (state.detailId == form.dataset.delete) state.detailId = null;
+      await trains();
+      notice('Trem excluído.');
+    } catch (error) {
+      notice(error.message, true);
+    }
+  });
+  if (state.detailId) await showTrainDetail(state.detailId);
 }
-async function showTrainDetail(id){const t=await api('trains/'+id);const histories=await Promise.all(t.sensors.map(s=>api(`sensors/${s.id}/readings`)));const panel=document.getElementById('train-panel');if(panel)panel.innerHTML=card(`Detalhes · ${t.code}`,`<p>${esc(t.name)} · ${statusBadge(t.status)}</p><h3>Sensores e leituras recentes</h3>${t.sensors.map((s,i)=>`<details><summary>${esc(s.code)}: ${esc(s.latest_value??'—')} ${esc(s.unit)} · ${statusBadge(s.status)}</summary>${histories[i].map(r=>`<p>${date(r.recorded_at)} · ${esc(r.value)} ${esc(s.unit)} · ${esc(r.source)}</p>`).join('')||empty()}</details>`).join('')||empty()}<h3>Manutenções</h3>${t.maintenances.map(m=>`<p>${esc(m.title)} · ${date(m.scheduled_at)}</p>`).join('')||empty()}`)}
+async function showTrainDetail(id) {
+  const t = await api('trains/'+id);
+  const histories = await Promise.all(t.sensors.map(s => api(`sensors/${s.id}/readings`)));
+  const panel = document.getElementById('train-panel');
+  if (panel) panel.innerHTML = card(`Detalhes · ${t.code}`,
+    `<p>${esc(t.name)} · ${statusBadge(t.status)}</p><h3>Sensores e leituras recentes</h3>${t.sensors.map((s,i)=>`<details><summary>${esc(s.code)}: ${esc(s.latest_value??'—')} ${esc(s.unit)} · ${statusBadge(s.status)}</summary>${histories[i].map(r=>`<p>${date(r.recorded_at)} · ${esc(r.value)} ${esc(s.unit)} · ${esc(r.source)}</p>`).join('')||empty()}</details>`).join('')||empty()}<h3>Manutenções</h3>${t.maintenances.map(m=>`<p>${esc(m.title)} · ${date(m.scheduled_at)}</p>`).join('')||empty()}`
+  );
+}
 async function trainFormPage() {
   const id = new URLSearchParams(location.search).get('id');
   if (id && !/^\d+$/.test(id)) throw Error('Trem inválido.');
@@ -116,8 +152,18 @@ async function sensorsPage() {
       s.reading_indicator ? `${managementBadge(sensorIndicatorLabels[s.reading_indicator],sensorIndicatorTone[s.reading_indicator])}<br><small>${esc(s.latest_value)} ${esc(s.unit)} · ${date(s.latest_reading_at)}</small>` : '<span class="data-note">Sem leitura</span>',
       `<a class="text-link" href="${root}sensores_form.php?id=${s.id}">Editar</a> <form class="inline-form" data-sensor-delete="${s.id}"><button class="text-link danger-link" type="submit">Excluir</button></form>`
     ])));
-  app.querySelector('[name=type]').onchange=e=>{state.sensorType=e.target.value;sensorsPage()};
-  app.querySelectorAll('[data-sensor-delete]').forEach(form=>form.onsubmit=async e=>{e.preventDefault();if(!confirm('Confirma a exclusão deste sensor?'))return;try{await api('sensors/'+form.dataset.sensorDelete+'/delete','POST');await sensorsPage();notice('Sensor excluído.')}catch(error){notice(error.message,true)}});
+  app.querySelector('[name=type]').onchange = e => { state.sensorType = e.target.value; sensorsPage(); };
+  app.querySelectorAll('[data-sensor-delete]').forEach(form => form.onsubmit = async e => {
+    e.preventDefault();
+    if (!confirm('Confirma a exclusão deste sensor?')) return;
+    try {
+      await api('sensors/'+form.dataset.sensorDelete+'/delete', 'POST');
+      await sensorsPage();
+      notice('Sensor excluído.');
+    } catch (error) {
+      notice(error.message, true);
+    }
+  });
 }
 async function sensorFormPage() {
   const id = new URLSearchParams(location.search).get('id');
@@ -138,14 +184,164 @@ async function sensorFormPage() {
     </div><p class="data-note">O indicador é calculado pela leitura mais recente do sensor.</p><div class="toolbar"><button class="button primary">Salvar sensor</button><a class="button secondary" href="${root}sensores.php">Cancelar</a></div></form>`);
   onForm('sensor-form',async data=>{await api(s?'sensors/'+s.id:'sensors',s?'PATCH':'POST',data);location.href=root+'sensores.php'});
 }
-async function tickets(){const [map,all]=await Promise.all([api('map'),api('schedules')]);const filtered=all.filter(s=>(!state.origin||s.origin_id==state.origin)&&(!state.destination||s.destination_id==state.destination));app.innerHTML=head('Horários e bilhetes','Simule uma viagem. Nenhuma compra ou reserva é feita.')+card('Mapa ferroviário',mapView(map))+card('Buscar horários',`<div class="form-two">${select('Origem','origin',[['','Todas'],...option(map.stations)],state.origin)}${select('Destino','destination',[['','Todos'],...option(map.stations)],state.destination)}</div>`+table(['Trem','Origem','Destino','Partida','Chegada','Tarifa'],filtered.map(s=>`<tr><td>${esc(s.train_code)}</td><td>${esc(s.origin_name)}</td><td>${esc(s.destination_name)}</td><td>${date(s.departure_at)}</td><td>${date(s.arrival_at)}</td><td>${money(s.base_price)}</td></tr>`)))+card('Simular passagem',`<form id="ticket-form" class="form-stack">${select('Ida','schedule_id',[['','Selecione'],...filtered.map(s=>[s.id,`${s.origin_name} → ${s.destination_name} · ${date(s.departure_at)} · ${money(s.base_price)}`])])}${select('Volta opcional','return_schedule_id',[['','Somente ida'],...all.map(s=>[s.id,`${s.origin_name} → ${s.destination_name} · ${date(s.departure_at)}`])])}${field('Passageiros (1 a 8)','passengers',1,'number','min="1" max="8" required')}<button class="button primary">Calcular e registrar simulação</button></form><p class="data-note">Esta simulação não compra nem reserva passagens.</p>`);app.querySelector('[name=origin]').onchange=e=>{state.origin=e.target.value;tickets()};app.querySelector('[name=destination]').onchange=e=>{state.destination=e.target.value;tickets()};onForm('ticket-form',async d=>{const r=await api('tickets/simulate','POST',{schedule_id:Number(d.schedule_id),return_schedule_id:Number(d.return_schedule_id||0),passengers:Number(d.passengers)});notice(`${r.message} Total estimado: ${money(r.total)}.`)});}
-async function reports(){const [trains,sensors]=await Promise.all([api('trains'),api('sensors')]);let rows=null;if(state.report)rows=await api('reports?'+new URLSearchParams(state.report));app.innerHTML=head('Relatórios','Filtre leituras e ocorrências por período, trem e sensor.',`<button class="button secondary" id="print">Imprimir / Salvar PDF</button><button class="button secondary" id="csv">Exportar CSV</button>`)+card('Filtros',`<form id="report-form" class="report-filters">${field('De','from',state.report?.from||new Date(Date.now()-30*86400000).toISOString().slice(0,10),'date','required')}${field('Até','to',state.report?.to||new Date().toISOString().slice(0,10),'date','required')}${select('Trem','train_id',[['','Todos'],...trains.map(x=>[x.id,x.code])],state.report?.train_id||'')}${select('Sensor','sensor_id',[['','Todos'],...sensors.map(x=>[x.id,x.code])],state.report?.sensor_id||'')}<button class="button primary">Gerar relatório</button></form>`)+card('Resultado',rows?table(['Trem','Sensor','Tipo','Status','Última leitura','Data','Ocorrências'],rows.map(x=>`<tr><td>${esc(x.train_code)}</td><td>${esc(x.sensor_code)}</td><td>${esc(x.type)}</td><td>${statusBadge(x.status)}</td><td>${esc(x.latest_value??'—')} ${esc(x.unit)}</td><td>${date(x.latest_reading_at)}</td><td>${num(x.occurrences)}</td></tr>`)):empty('Defina os filtros e gere o relatório.'));onForm('report-form',async d=>{state.report=d;reports()});document.getElementById('print').onclick=()=>window.print();document.getElementById('csv').onclick=()=>{if(!rows){notice('Gere o relatório primeiro.',true);return;}const cols=['train_code','sensor_code','type','status','latest_value','latest_reading_at','occurrences'];const cell=v=>{const raw=String(v??'');const safe=/^[=+\-@]/.test(raw)?"'"+raw:raw;return '"'+safe.replaceAll('"','""')+'"'};const csv=[cols.join(';'),...rows.map(r=>cols.map(k=>cell(r[k])).join(';'))].join('\r\n');download('relatorio-atrain.csv','\ufeff'+csv,'text/csv;charset=utf-8');};}
+async function tickets() {
+  const [map, all] = await Promise.all([api('map'), api('schedules')]);
+  const filtered = all.filter(s =>
+    (!state.origin || s.origin_id == state.origin) &&
+    (!state.destination || s.destination_id == state.destination)
+  );
+  app.innerHTML = head('Horários e bilhetes', 'Simule uma viagem. Nenhuma compra ou reserva é feita.') +
+    card('Mapa ferroviário', mapView(map)) +
+    card('Buscar horários',
+      `<div class="form-two">${select('Origem','origin',[['','Todas'],...option(map.stations)],state.origin)}${select('Destino','destination',[['','Todos'],...option(map.stations)],state.destination)}</div>` +
+      table(['Trem', 'Origem', 'Destino', 'Partida', 'Chegada', 'Tarifa'], filtered.map(s =>
+        `<tr><td>${esc(s.train_code)}</td><td>${esc(s.origin_name)}</td><td>${esc(s.destination_name)}</td><td>${date(s.departure_at)}</td><td>${date(s.arrival_at)}</td><td>${money(s.base_price)}</td></tr>`
+      ))
+    ) +
+    card('Simular passagem',
+      `<form id="ticket-form" class="form-stack">${select('Ida','schedule_id',[['','Selecione'],...filtered.map(s=>[s.id,`${s.origin_name} → ${s.destination_name} · ${date(s.departure_at)} · ${money(s.base_price)}`])])}${select('Volta opcional','return_schedule_id',[['','Somente ida'],...all.map(s=>[s.id,`${s.origin_name} → ${s.destination_name} · ${date(s.departure_at)}`])])}${field('Passageiros (1 a 8)','passengers',1,'number','min="1" max="8" required')}<button class="button primary">Calcular e registrar simulação</button></form><p class="data-note">Esta simulação não compra nem reserva passagens.</p>`
+    );
+  app.querySelector('[name=origin]').onchange = e => { state.origin = e.target.value; tickets(); };
+  app.querySelector('[name=destination]').onchange = e => { state.destination = e.target.value; tickets(); };
+  onForm('ticket-form', async d => {
+    const r = await api('tickets/simulate', 'POST', {
+      schedule_id: Number(d.schedule_id),
+      return_schedule_id: Number(d.return_schedule_id || 0),
+      passengers: Number(d.passengers)
+    });
+    notice(`${r.message} Total estimado: ${money(r.total)}.`);
+  });
+}
+async function reports() {
+  const [trains, sensors] = await Promise.all([api('trains'), api('sensors')]);
+  let rows = null;
+  if (state.report) rows = await api('reports?'+new URLSearchParams(state.report));
+  app.innerHTML = head('Relatórios', 'Filtre leituras e ocorrências por período, trem e sensor.',
+      `<button class="button secondary" id="print">Imprimir / Salvar PDF</button><button class="button secondary" id="csv">Exportar CSV</button>`
+    ) +
+    card('Filtros',
+      `<form id="report-form" class="report-filters">${field('De','from',state.report?.from||new Date(Date.now()-30*86400000).toISOString().slice(0,10),'date','required')}${field('Até','to',state.report?.to||new Date().toISOString().slice(0,10),'date','required')}${select('Trem','train_id',[['','Todos'],...trains.map(x=>[x.id,x.code])],state.report?.train_id||'')}${select('Sensor','sensor_id',[['','Todos'],...sensors.map(x=>[x.id,x.code])],state.report?.sensor_id||'')}<button class="button primary">Gerar relatório</button></form>`
+    ) +
+    card('Resultado', rows
+      ? table(['Trem', 'Sensor', 'Tipo', 'Status', 'Última leitura', 'Data', 'Ocorrências'], rows.map(x =>
+          `<tr><td>${esc(x.train_code)}</td><td>${esc(x.sensor_code)}</td><td>${esc(x.type)}</td><td>${statusBadge(x.status)}</td><td>${esc(x.latest_value??'—')} ${esc(x.unit)}</td><td>${date(x.latest_reading_at)}</td><td>${num(x.occurrences)}</td></tr>`
+        ))
+      : empty('Defina os filtros e gere o relatório.'));
+  onForm('report-form', async d => { state.report = d; reports(); });
+  document.getElementById('print').onclick = () => window.print();
+  document.getElementById('csv').onclick = () => {
+    if (!rows) { notice('Gere o relatório primeiro.', true); return; }
+    const cols = ['train_code', 'sensor_code', 'type', 'status', 'latest_value', 'latest_reading_at', 'occurrences'];
+    const cell = v => {
+      const raw = String(v ?? '');
+      const safe = /^[=+\-@]/.test(raw) ? "'"+raw : raw;
+      return '"'+safe.replaceAll('"','""')+'"';
+    };
+    const csv = [cols.join(';'), ...rows.map(r => cols.map(k => cell(r[k])).join(';'))].join('\r\n');
+    download('relatorio-atrain.csv', '\ufeff'+csv, 'text/csv;charset=utf-8');
+  };
+}
 function download(name,content,type){const a=document.createElement('a'),u=URL.createObjectURL(new Blob([content],{type}));a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}
-async function notifications(){const [alerts,pref]=await Promise.all([api('notifications'),api('notifications/preferences')]);const filtered=alerts.filter(a=>state.notifTab==='all'||(state.notifTab==='unread'?!Number(a.is_read):a.severity===state.notifTab));app.innerHTML=head('Notificações','Alertas da frota e preferências de contato.')+`<div class="toolbar">${select('Exibir','tab',[['all','Todas'],['unread','Não lidas'],['critical','Críticas'],['warning','Avisos']],state.notifTab)}</div>`+card('Central de notificações',filtered.map(a=>`<div class="notification-row"><div>${statusBadge(a.severity)} <strong>${esc(a.title)}</strong><p>${esc(a.message)}</p><small>${date(a.created_at)} · ${esc(a.train_code||'Sistema')}</small></div>${Number(a.is_read)?'<span>Lida</span>':`<button class="button secondary" data-read="${a.id}">Marcar como lida</button>`}</div>`).join('')||empty())+card('Preferências de entrega (integrações simuladas)',`<form id="pref-form" class="form-stack">${[['email_enabled','E-mail'],['push_enabled','Push'],['sms_enabled','SMS']].map(([k,l])=>`<label class="check"><input type="checkbox" name="${k}" ${Number(pref[k])?'checked':''}> ${l}</label>`).join('')}<button class="button primary">Salvar preferências</button></form><p class="data-note">Estas opções são salvas; envios externos ainda são simulações.</p>`);app.querySelector('[name=tab]').onchange=e=>{state.notifTab=e.target.value;notifications()};app.querySelectorAll('[data-read]').forEach(b=>b.onclick=async()=>{await api(`notifications/${b.dataset.read}/read`,'POST');notifications()});onForm('pref-form',async(d,f)=>{await api('notifications/preferences','PATCH',Object.fromEntries(['email_enabled','push_enabled','sms_enabled'].map(k=>[k,f.elements[k].checked])));notice('Preferências salvas.')});}
-async function alertsPage(){const d=await api('notifications');app.innerHTML=head('Alertas operacionais','Acompanhe ocorrências registradas pela frota.')+card('Alertas',table(['Título','Trem','Severidade','Status','Criado em'],d.map(x=>`<tr><td>${esc(x.title)}<br><small>${esc(x.message)}</small></td><td>${esc(x.train_code||'—')}</td><td>${statusBadge(x.severity)}</td><td>${statusBadge(x.status)}</td><td>${date(x.created_at)}</td></tr>`)));}
-async function profile(){const d=await api('profile');app.innerHTML=head('Meu perfil','Dados da sua conta e função na operação.')+card('Informações da conta',`<p><strong>${esc(d.name)}</strong><br>${esc(d.email)}<br>${statusBadge(d.role)} ${statusBadge(d.status)}<br>Criado em ${date(d.created_at)}</p><form id="profile-form" class="form-stack narrow">${field('Nome','name',d.name,'text','required maxlength="120"')}${field('Cargo','job_title',d.job_title,'text','required maxlength="120"')}<button class="button primary">Salvar perfil</button></form>`);onForm('profile-form',async v=>{await api('profile','PATCH',v);notice('Perfil atualizado.')});}
-async function settings(){app.innerHTML=head('Configurações','Gerencie segurança e dados da sua conta.')+card('Alterar senha',`<form id="password-form" class="form-stack narrow">${field('Senha atual','old_password','','password','required')}${field('Nova senha','new_password','','password','required minlength="12"')}${field('Confirmar nova senha','confirm','','password','required minlength="12"')}<button class="button primary">Alterar senha</button></form>`)+card('Dados da conta',`<button class="button secondary" id="export">Exportar dados JSON</button><p class="data-note">Arquivo pessoal para consulta e portabilidade.</p>`)+card('Encerrar conta',`<form id="account-form" class="form-stack narrow">${field('Confirme sua senha','password','','password','required')}<div class="toolbar"><button type="button" class="button secondary" id="deactivate">Desativar conta</button><button type="button" class="button danger" id="delete">Excluir conta</button></div></form>`)+card('Idioma e pagamentos',`<label class="field"><span>Idioma preferido</span><select id="language"><option value="pt-BR">Português</option><option value="en-US">English</option></select></label><p class="data-note">A preferência de idioma é local. Pagamentos são apenas ilustrativos.</p>`);onForm('password-form',async d=>{if(d.new_password!==d.confirm)throw Error('As senhas não coincidem.');delete d.confirm;await api('profile/password','POST',d);notice('Senha alterada.')});document.getElementById('export').onclick=async()=>download('atrain-dados.json',JSON.stringify(await api('profile/export'),null,2),'application/json');for(const mode of ['deactivate','delete'])document.getElementById(mode).onclick=async()=>{if(!confirm(mode==='delete'?'Excluir sua conta permanentemente?':'Desativar sua conta?'))return;try{await api('profile/'+mode,'POST',{password:document.querySelector('#account-form [name=password]').value});location.href=link('login')}catch(e){notice(e.message,true)}};const lang=document.getElementById('language');lang.value=localStorage.getItem('atrain.language')||'pt-BR';lang.onchange=()=>{localStorage.setItem('atrain.language',lang.value);notice('Preferência salva neste navegador.')};}
-async function help(){app.innerHTML=head('Ajuda e suporte','Encontre respostas e envie uma solicitação.')+`<div class="help-grid">${card('Perguntas frequentes',`<details><summary>Os dados são atualizados automaticamente?</summary><p>Sim, as páginas operacionais consultam a API a cada cinco segundos quando visíveis.</p></details><details><summary>Uma simulação reserva passagem?</summary><p>Não. A simulação apenas calcula e registra uma estimativa.</p></details><details><summary>Como salvar um relatório em PDF?</summary><p>Use Imprimir / Salvar PDF na página de relatórios.</p></details>`)}${card('Fale com o suporte',`<form id="support-form" class="form-stack">${field('Assunto','subject','','text','required maxlength="160"')}<label class="field"><span>Mensagem</span><textarea name="message" required maxlength="3000" rows="7"></textarea></label><button class="button primary">Enviar solicitação</button></form><p class="data-note">Sua solicitação será salva na sua conta.</p>`)}</div>`;onForm('support-form',async(d,f)=>{await api('support','POST',d);f.reset();notice('Solicitação registrada.')});}
+async function notifications() {
+  const [alerts, pref] = await Promise.all([api('notifications'), api('notifications/preferences')]);
+  const filtered = alerts.filter(a =>
+    state.notifTab === 'all' || (state.notifTab === 'unread' ? !Number(a.is_read) : a.severity === state.notifTab)
+  );
+  app.innerHTML = head('Notificações', 'Alertas da frota e preferências de contato.') +
+    `<div class="toolbar">${select('Exibir','tab',[['all','Todas'],['unread','Não lidas'],['critical','Críticas'],['warning','Avisos']],state.notifTab)}</div>` +
+    card('Central de notificações', filtered.map(a =>
+      `<div class="notification-row"><div>${statusBadge(a.severity)} <strong>${esc(a.title)}</strong><p>${esc(a.message)}</p><small>${date(a.created_at)} · ${esc(a.train_code||'Sistema')}</small></div>${Number(a.is_read)?'<span>Lida</span>':`<button class="button secondary" data-read="${a.id}">Marcar como lida</button>`}</div>`
+    ).join('') || empty()) +
+    card('Preferências de entrega (integrações simuladas)',
+      `<form id="pref-form" class="form-stack">${[['email_enabled','E-mail'],['push_enabled','Push'],['sms_enabled','SMS']].map(([k,l])=>`<label class="check"><input type="checkbox" name="${k}" ${Number(pref[k])?'checked':''}> ${l}</label>`).join('')}<button class="button primary">Salvar preferências</button></form><p class="data-note">Estas opções são salvas; envios externos ainda são simulações.</p>`
+    );
+  app.querySelector('[name=tab]').onchange = e => { state.notifTab = e.target.value; notifications(); };
+  app.querySelectorAll('[data-read]').forEach(b => b.onclick = async () => {
+    await api(`notifications/${b.dataset.read}/read`, 'POST');
+    notifications();
+  });
+  onForm('pref-form', async (d, f) => {
+    await api('notifications/preferences', 'PATCH',
+      Object.fromEntries(['email_enabled', 'push_enabled', 'sms_enabled'].map(k => [k, f.elements[k].checked]))
+    );
+    notice('Preferências salvas.');
+  });
+}
+async function alertsPage() {
+  const d = await api('notifications');
+  app.innerHTML = head('Alertas operacionais', 'Acompanhe ocorrências registradas pela frota.') +
+    card('Alertas', table(['Título', 'Trem', 'Severidade', 'Status', 'Criado em'], d.map(x =>
+      `<tr><td>${esc(x.title)}<br><small>${esc(x.message)}</small></td><td>${esc(x.train_code||'—')}</td><td>${statusBadge(x.severity)}</td><td>${statusBadge(x.status)}</td><td>${date(x.created_at)}</td></tr>`
+    )));
+}
+async function profile() {
+  const d = await api('profile');
+  app.innerHTML = head('Meu perfil', 'Dados da sua conta e função na operação.') +
+    card('Informações da conta',
+      `<p><strong>${esc(d.name)}</strong><br>${esc(d.email)}<br>${statusBadge(d.role)} ${statusBadge(d.status)}<br>Criado em ${date(d.created_at)}</p><form id="profile-form" class="form-stack narrow">${field('Nome','name',d.name,'text','required maxlength="120"')}${field('Cargo','job_title',d.job_title,'text','required maxlength="120"')}<button class="button primary">Salvar perfil</button></form>`
+    );
+  onForm('profile-form', async v => {
+    await api('profile', 'PATCH', v);
+    notice('Perfil atualizado.');
+  });
+}
+async function settings() {
+  app.innerHTML = head('Configurações', 'Gerencie segurança e dados da sua conta.') +
+    card('Alterar senha',
+      `<form id="password-form" class="form-stack narrow">${field('Senha atual','old_password','','password','required')}${field('Nova senha','new_password','','password','required minlength="12"')}${field('Confirmar nova senha','confirm','','password','required minlength="12"')}<button class="button primary">Alterar senha</button></form>`
+    ) +
+    card('Dados da conta',
+      `<button class="button secondary" id="export">Exportar dados JSON</button><p class="data-note">Arquivo pessoal para consulta e portabilidade.</p>`
+    ) +
+    card('Encerrar conta',
+      `<form id="account-form" class="form-stack narrow">${field('Confirme sua senha','password','','password','required')}<div class="toolbar"><button type="button" class="button secondary" id="deactivate">Desativar conta</button><button type="button" class="button danger" id="delete">Excluir conta</button></div></form>`
+    ) +
+    card('Idioma e pagamentos',
+      `<label class="field"><span>Idioma preferido</span><select id="language"><option value="pt-BR">Português</option><option value="en-US">English</option></select></label><p class="data-note">A preferência de idioma é local. Pagamentos são apenas ilustrativos.</p>`
+    );
+  onForm('password-form', async d => {
+    if (d.new_password !== d.confirm) throw Error('As senhas não coincidem.');
+    delete d.confirm;
+    await api('profile/password', 'POST', d);
+    notice('Senha alterada.');
+  });
+  document.getElementById('export').onclick = async () =>
+    download('atrain-dados.json', JSON.stringify(await api('profile/export'), null, 2), 'application/json');
+  for (const mode of ['deactivate', 'delete']) {
+    document.getElementById(mode).onclick = async () => {
+      if (!confirm(mode === 'delete' ? 'Excluir sua conta permanentemente?' : 'Desativar sua conta?')) return;
+      try {
+        await api('profile/'+mode, 'POST', { password: document.querySelector('#account-form [name=password]').value });
+        location.href = link('login');
+      } catch (e) {
+        notice(e.message, true);
+      }
+    };
+  }
+  const lang = document.getElementById('language');
+  lang.value = localStorage.getItem('atrain.language') || 'pt-BR';
+  lang.onchange = () => {
+    localStorage.setItem('atrain.language', lang.value);
+    notice('Preferência salva neste navegador.');
+  };
+}
+async function help() {
+  app.innerHTML = head('Ajuda e suporte', 'Encontre respostas e envie uma solicitação.') +
+    `<div class="help-grid">${
+      card('Perguntas frequentes',
+        `<details><summary>Os dados são atualizados automaticamente?</summary><p>Sim, as páginas operacionais consultam a API a cada cinco segundos quando visíveis.</p></details><details><summary>Uma simulação reserva passagem?</summary><p>Não. A simulação apenas calcula e registra uma estimativa.</p></details><details><summary>Como salvar um relatório em PDF?</summary><p>Use Imprimir / Salvar PDF na página de relatórios.</p></details>`
+      )
+    }${
+      card('Fale com o suporte',
+        `<form id="support-form" class="form-stack">${field('Assunto','subject','','text','required maxlength="160"')}<label class="field"><span>Mensagem</span><textarea name="message" required maxlength="3000" rows="7"></textarea></label><button class="button primary">Enviar solicitação</button></form><p class="data-note">Sua solicitação será salva na sua conta.</p>`
+      )
+    }</div>`;
+  onForm('support-form', async (d, f) => {
+    await api('support', 'POST', d);
+    f.reset();
+    notice('Solicitação registrada.');
+  });
+}
 const adminFields={
  users:[['name','Nome'],['job_title','Cargo'],['role','Papel',roleOptions],['status','Status',[['active','Ativo'],['disabled','Desativado'],['banned','Banido']]]],
  trains:[['name','Nome'],['status','Status',statuses],['capacity','Capacidade',null,'number'],['latitude','Latitude',null,'number'],['longitude','Longitude',null,'number'],['station_id','ID da estação',null,'number']],
@@ -154,16 +350,115 @@ const adminFields={
  alerts:[['status','Status',[['active','Ativo'],['resolved','Resolvido']]],['severity','Severidade',[['critical','Crítico'],['warning','Aviso'],['info','Informação'],['system','Sistema']]],['message','Mensagem']]
 };
 let adminEntity='users';
-async function admin(){const users=await api('users');const overview=await api('admin/overview');const [trains,sensors,settings]=await Promise.all([api('trains'),api('sensors'),api('admin/settings')]);const groups={users,trains,sensors,maintenances:overview.maintenances,alerts:overview.alerts_list};if(page==='usuarios')adminEntity='users';const names={users:'Usuários',trains:'Trens',sensors:'Sensores',maintenances:'Manutenções',alerts:'Alertas'};app.innerHTML=head(page==='usuarios'?'Gestão de usuários':'Centro de administração','Ações restritas ao Super Admin e registradas em auditoria.')+`<div class="metrics-grid">${[['Usuários',overview.users],['Trens',overview.trains],['Sensores',overview.sensors],['Alertas ativos',overview.alerts]].map(([k,v])=>`<div class="card metric-card"><span>${k}</span><strong>${num(v)}</strong></div>`).join('')}</div>`+`<div class="admin-tabs toolbar">${Object.entries(names).filter(([k])=>page!=='usuarios'||k==='users').map(([k,v])=>`<button class="button ${k===adminEntity?'primary':'secondary'}" data-entity="${k}">${v}</button>`).join('')}</div>`+card(names[adminEntity],table(['ID','Identificação','Estado','Ação'],groups[adminEntity].map(x=>`<tr><td>${x.id}</td><td>${esc(x.name||x.code||x.title||x.subject||'Registro')}</td><td>${statusBadge(x.status||x.role||'—')}</td><td><button class="text-link" data-admin-edit="${x.id}">Editar</button></td></tr>`)))+`<div id="admin-editor"></div>`+
- (page==='admin'?card('Configurações permitidas',settings.map(s=>`<form class="setting-editor" data-setting="${esc(s.key)}"><strong>${esc(s.key)}</strong><small>${esc(s.description)}</small><input name="value" value="${esc(s.value)}" aria-label="Valor de ${esc(s.key)}" required><button class="button secondary">Salvar</button></form>`).join(''))+card('Atividade recente',table(['Data','Autor','Ação','Entidade'],overview.logs.map(x=>`<tr><td>${date(x.created_at)}</td><td>${esc(x.actor_name||'Sistema')}</td><td>${esc(x.action)}</td><td>${esc(x.entity)} #${esc(x.entity_id||'—')}</td></tr>`))):'');
- app.querySelectorAll('[data-entity]').forEach(b=>b.onclick=()=>{adminEntity=b.dataset.entity;admin()});
- app.querySelectorAll('[data-admin-edit]').forEach(b=>b.onclick=()=>adminEdit(adminEntity,groups[adminEntity].find(x=>x.id==b.dataset.adminEdit)));
- app.querySelectorAll('[data-setting]').forEach(f=>f.onsubmit=async e=>{e.preventDefault();try{await api('admin/settings','PATCH',{key:f.dataset.setting,value:f.elements.value.value});notice('Configuração salva e auditada.')}catch(err){notice(err.message,true)}});
+async function admin() {
+  const users = await api('users');
+  const overview = await api('admin/overview');
+  const [trains, sensors, settings] = await Promise.all([api('trains'), api('sensors'), api('admin/settings')]);
+  const groups = { users, trains, sensors, maintenances: overview.maintenances, alerts: overview.alerts_list };
+  if (page === 'usuarios') adminEntity = 'users';
+  const names = { users: 'Usuários', trains: 'Trens', sensors: 'Sensores', maintenances: 'Manutenções', alerts: 'Alertas' };
+  app.innerHTML = head(
+      page === 'usuarios' ? 'Gestão de usuários' : 'Centro de administração',
+      'Ações restritas ao Super Admin e registradas em auditoria.'
+    ) +
+    `<div class="metrics-grid">${[['Usuários',overview.users],['Trens',overview.trains],['Sensores',overview.sensors],['Alertas ativos',overview.alerts]].map(([k,v])=>`<div class="card metric-card"><span>${k}</span><strong>${num(v)}</strong></div>`).join('')}</div>` +
+    `<div class="admin-tabs toolbar">${Object.entries(names).filter(([k])=>page!=='usuarios'||k==='users').map(([k,v])=>`<button class="button ${k===adminEntity?'primary':'secondary'}" data-entity="${k}">${v}</button>`).join('')}</div>` +
+    card(names[adminEntity], table(['ID', 'Identificação', 'Estado', 'Ação'], groups[adminEntity].map(x =>
+      `<tr><td>${x.id}</td><td>${esc(x.name||x.code||x.title||x.subject||'Registro')}</td><td>${statusBadge(x.status||x.role||'—')}</td><td><button class="text-link" data-admin-edit="${x.id}">Editar</button></td></tr>`
+    ))) +
+    `<div id="admin-editor"></div>` +
+    (page === 'admin'
+      ? card('Configurações permitidas', settings.map(s =>
+          `<form class="setting-editor" data-setting="${esc(s.key)}"><strong>${esc(s.key)}</strong><small>${esc(s.description)}</small><input name="value" value="${esc(s.value)}" aria-label="Valor de ${esc(s.key)}" required><button class="button secondary">Salvar</button></form>`
+        ).join('')) +
+        card('Atividade recente', table(['Data', 'Autor', 'Ação', 'Entidade'], overview.logs.map(x =>
+          `<tr><td>${date(x.created_at)}</td><td>${esc(x.actor_name||'Sistema')}</td><td>${esc(x.action)}</td><td>${esc(x.entity)} #${esc(x.entity_id||'—')}</td></tr>`
+        )))
+      : '');
+  app.querySelectorAll('[data-entity]').forEach(b => b.onclick = () => { adminEntity = b.dataset.entity; admin(); });
+  app.querySelectorAll('[data-admin-edit]').forEach(b => b.onclick = () =>
+    adminEdit(adminEntity, groups[adminEntity].find(x => x.id == b.dataset.adminEdit))
+  );
+  app.querySelectorAll('[data-setting]').forEach(f => f.onsubmit = async e => {
+    e.preventDefault();
+    try {
+      await api('admin/settings', 'PATCH', { key: f.dataset.setting, value: f.elements.value.value });
+      notice('Configuração salva e auditada.');
+    } catch (err) {
+      notice(err.message, true);
+    }
+  });
 }
-function adminEdit(entity,item){state.pauseRefresh=true;const panel=document.getElementById('admin-editor');panel.innerHTML=card(`Editar ${entity} #${item.id}`,`<form id="admin-form" class="form-stack"><div class="form-two">${adminFields[entity].map(([k,label,opts,type])=>opts?select(label,k,opts,item[k]||''):field(label,k,type==='datetime-local'?localDateTimeInput(item[k]):item[k]??'',type||'text',type==='number'?'step="any"':'')).join('')}</div><button class="button primary">Salvar alteração</button><button type="button" class="button secondary" id="cancel-admin">Cancelar</button></form>`);panel.scrollIntoView({behavior:'smooth'});document.getElementById('cancel-admin').onclick=()=>{state.pauseRefresh=false;panel.innerHTML=''};onForm('admin-form',async d=>{for(const [k,,,type] of adminFields[entity]){if(type==='number')d[k]=d[k]===''?null:Number(d[k]);if(type==='datetime-local')d[k]=new Date(d[k]).toISOString().slice(0,19).replace('T',' ');}await api(`admin/${entity}/${item.id}`,'PATCH',d);state.pauseRefresh=false;await admin();notice('Alteração salva e auditada.')});}
+function adminEdit(entity, item) {
+  state.pauseRefresh = true;
+  const panel = document.getElementById('admin-editor');
+  panel.innerHTML = card(`Editar ${entity} #${item.id}`,
+    `<form id="admin-form" class="form-stack"><div class="form-two">${adminFields[entity].map(([k,label,opts,type])=>opts?select(label,k,opts,item[k]||''):field(label,k,type==='datetime-local'?localDateTimeInput(item[k]):item[k]??'',type||'text',type==='number'?'step="any"':'')).join('')}</div><button class="button primary">Salvar alteração</button><button type="button" class="button secondary" id="cancel-admin">Cancelar</button></form>`
+  );
+  panel.scrollIntoView({ behavior: 'smooth' });
+  document.getElementById('cancel-admin').onclick = () => { state.pauseRefresh = false; panel.innerHTML = ''; };
+  onForm('admin-form', async d => {
+    for (const [k, , , type] of adminFields[entity]) {
+      if (type === 'number') d[k] = d[k] === '' ? null : Number(d[k]);
+      if (type === 'datetime-local') d[k] = new Date(d[k]).toISOString().slice(0, 19).replace('T', ' ');
+    }
+    await api(`admin/${entity}/${item.id}`, 'PATCH', d);
+    state.pauseRefresh = false;
+    await admin();
+    notice('Alteração salva e auditada.');
+  });
+}
 const routes={dashboard,trens:trains,trens_form:trainFormPage,sensores:sensorsPage,sensores_form:sensorFormPage,rotas:routesPage,rotas_form:routeFormPage,leituras:readingsPage,simulador:simulatorPage,notificacoes_alertas:operationalAlertsPage,alertas:alertsPage,localizacao:mapPage,bilhetes:tickets,relatorios:reports,notificacoes:notifications,perfil:profile,configuracoes:settings,ajuda:help,usuarios:admin,admin};
-async function load(){try{if(['login','cadastro','recuperar','redefinir'].includes(page))await auth();else if(routes[page])await routes[page]();else app.innerHTML=head('Página indisponível','Confira o endereço ou suas permissões.');}catch(e){app.innerHTML=head('Não foi possível carregar',e.message);}}
-document.getElementById('logout')?.addEventListener('click',async()=>{try{await api('auth/logout','POST');location.href=link('login')}catch(e){notice(e.message,true)}});
-document.getElementById('menu')?.addEventListener('click',()=>document.getElementById('sidebar').classList.toggle('is-open'));
+async function load() {
+  try {
+    if (['login', 'cadastro', 'recuperar', 'redefinir'].includes(page)) await auth();
+    else if (routes[page]) await routes[page]();
+    else app.innerHTML = head('Página indisponível', 'Confira o endereço ou suas permissões.');
+  } catch (e) {
+    app.innerHTML = head('Não foi possível carregar', e.message);
+  }
+}
+document.getElementById('logout')?.addEventListener('click', async () => {
+  try {
+    await api('auth/logout', 'POST');
+    location.href = link('login');
+  } catch (e) {
+    notice(e.message, true);
+  }
+});
+document.getElementById('menu')?.addEventListener('click', () =>
+  document.getElementById('sidebar').classList.toggle('is-open')
+);
 load();
-if(routes[page]){setInterval(async()=>{if(document.visibilityState!=='visible'||!navigator.onLine||state.pauseRefresh||Date.now()-(state.lastActivity||0)<10000||document.activeElement?.matches('input,textarea,select'))return;try{const session=await api('auth/me');csrf=session.csrf;user=session.user;if(['admin','usuarios'].includes(page)&&user.role!=='super_admin'){location.href=root;return;}if(['trens','trens_form','sensores','sensores_form','rotas','rotas_form','simulador'].includes(page)&&!['manager','super_admin'].includes(user.role)){location.href=root;return;}await routes[page]()}catch(e){if(e.message.includes('Sessão'))location.href=link('login')}},5000);window.addEventListener('focus',()=>{if(!state.pauseRefresh&&!document.activeElement?.matches('input,textarea,select'))load()});document.addEventListener('pointerdown',()=>{state.lastActivity=Date.now()});document.addEventListener('keydown',()=>{state.lastActivity=Date.now()});}
+if (routes[page]) {
+  setInterval(async () => {
+    if (
+      document.visibilityState !== 'visible' ||
+      !navigator.onLine ||
+      state.pauseRefresh ||
+      Date.now() - (state.lastActivity || 0) < 10000 ||
+      document.activeElement?.matches('input,textarea,select')
+    ) return;
+    try {
+      const session = await api('auth/me');
+      csrf = session.csrf;
+      user = session.user;
+      if (['admin', 'usuarios'].includes(page) && user.role !== 'super_admin') {
+        location.href = root;
+        return;
+      }
+      if (['trens', 'trens_form', 'sensores', 'sensores_form', 'rotas', 'rotas_form', 'simulador'].includes(page) && !['manager', 'super_admin'].includes(user.role)) {
+        location.href = root;
+        return;
+      }
+      await routes[page]();
+    } catch (e) {
+      if (e.message.includes('Sessão')) location.href = link('login');
+    }
+  }, 5000);
+  window.addEventListener('focus', () => {
+    if (!state.pauseRefresh && !document.activeElement?.matches('input,textarea,select')) load();
+  });
+  document.addEventListener('pointerdown', () => { state.lastActivity = Date.now(); });
+  document.addEventListener('keydown', () => { state.lastActivity = Date.now(); });
+}
