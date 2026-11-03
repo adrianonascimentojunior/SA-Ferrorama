@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../includes/limites.php';
+
 function envv(string $key, string $default = ''): string {
     static $local = null;
     if ($local === null) $local = is_file(__DIR__ . '/../config/local.php') ? require __DIR__ . '/../config/local.php' : [];
@@ -136,4 +138,74 @@ function audit(string $action, string $entity, ?int $entityId, array $details = 
 function enumValue(mixed $value, array $allowed, string $field): string {
     if (!is_string($value) || !in_array($value, $allowed, true)) fail("Valor inválido: $field.");
     return $value;
+}
+
+function modoDeManutencaoAtivo(): bool {
+    $valor = query("SELECT value FROM app_settings WHERE `key`='maintenance_mode'")->fetchColumn();
+    return $valor === 'true';
+}
+
+function filtroId(mixed $value, string $label): int {
+    if ($value === '' || $value === null) {
+        return 0;
+    }
+    $id = filter_var($value, FILTER_VALIDATE_INT);
+    if ($id === false || $id < 1) {
+        fail("Filtro inválido: $label.");
+    }
+    return $id;
+}
+
+function sensorSelect(): string {
+    return 'SELECT s.*, t.code AS train_code, t.name AS train_name,
+        (SELECT r.value FROM sensor_readings r WHERE r.sensor_id = s.id ORDER BY r.recorded_at DESC, r.id DESC LIMIT 1) AS calculated_value,
+        (SELECT r.recorded_at FROM sensor_readings r WHERE r.sensor_id = s.id ORDER BY r.recorded_at DESC, r.id DESC LIMIT 1) AS calculated_at
+        FROM sensors s JOIN trains t ON t.id = s.train_id';
+}
+
+function indicadorCalculado(array $sensor): array {
+    $sensor['latest_value'] = $sensor['calculated_value'];
+    $sensor['latest_reading_at'] = $sensor['calculated_at'];
+
+    $temPerfilConhecido = isset(perfisSensores()[$sensor['type']]);
+    $sensor['reading_indicator'] = ($sensor['calculated_value'] === null || !$temPerfilConhecido)
+        ? null
+        : classificarLeitura($sensor['type'], (float)$sensor['calculated_value']);
+
+    unset($sensor['calculated_value'], $sensor['calculated_at']);
+    return $sensor;
+}
+
+function rotaDados(array $data): array {
+    $trainId = sensorTrainId($data['train_id'] ?? null);
+    $origin = requiredString($data, 'origin', 80);
+    $destination = requiredString($data, 'destination', 80);
+    if (mb_strtolower($origin) === mb_strtolower($destination)) {
+        fail('Origem e destino devem ser diferentes.');
+    }
+
+    $travelDate = requiredString($data, 'travel_date', 10);
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $travelDate);
+    if (!$date || $date->format('Y-m-d') !== $travelDate) {
+        fail('Data da viagem inválida.');
+    }
+
+    $departure = requiredString($data, 'departure_time', 8);
+    $arrival = $data['arrival_time'] ?? null;
+    if ($arrival === '') {
+        $arrival = null;
+    }
+    $padraoHora = '/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/';
+    foreach ([$departure, $arrival] as $horario) {
+        if ($horario !== null && (!is_string($horario) || !preg_match($padraoHora, $horario))) {
+            fail('Horário inválido.');
+        }
+    }
+    if ($arrival !== null && $arrival <= $departure) {
+        fail('A chegada deve ser posterior à partida no mesmo dia.');
+    }
+
+    $status = enumValue($data['status'] ?? 'scheduled', ['scheduled', 'in_progress', 'completed', 'cancelled'], 'status');
+
+    return [$trainId, $origin, $destination, $travelDate, $departure, $arrival, $status];
 }

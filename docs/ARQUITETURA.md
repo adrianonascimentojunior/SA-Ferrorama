@@ -1,6 +1,6 @@
 # Arquitetura atual
 
-O Apache do XAMPP serve `index.php` e `public/assets`. `index.php` protege páginas por sessão e papel. O JavaScript puro apresenta os módulos, envia JSON à API em `/SA-Ferroama/api/` e atualiza dados visíveis periodicamente. O roteador PHP em `app/api.php` reaplica autenticação, papel, CSRF, validação e auditoria. PDO conecta ao MySQL Server 8.4 em `127.0.0.1:3306`, com prepared statements e `utf8mb4`.
+O Apache do XAMPP serve `index.php` e `public/assets`. `index.php` protege páginas por sessão e papel. O JavaScript puro apresenta os módulos, envia JSON à API em `/SA-Ferroama/api/` e atualiza dados visíveis periodicamente. `app/api.php` é o ponto de entrada da API: aplica autenticação, papel, CSRF e manutenção, e encaminha cada requisição para o módulo correspondente em `app/routes/` (um arquivo por área: `auth`, `dashboard`, `trens`, `sensores`, `rotas`, `leituras`, `alertas`, `mapa`, `bilhetes`, `relatorios`, `notificacoes`, `perfil`, `suporte`, `admin`). PDO conecta ao MySQL Server 8.4 em `127.0.0.1:3306`, com prepared statements e `utf8mb4`.
 
 O `.htaccess` da raiz permite por HTTP apenas a entrada `index.php`, a rota `api/` e `public/assets/`. Ferramentas locais de análise de código, caso instaladas, não são servidas e não participam da execução da aplicação.
 

@@ -56,7 +56,8 @@ Para criar o primeiro Super Admin, defina `ADMIN_EMAIL` e `ADMIN_PASSWORD` (12+ 
 | --- | --- |
 | `index.php` | Páginas e proteção inicial de sessão/papel |
 | `public/assets/css`, `public/assets/js` | Estilo e interações sem compilação |
-| `api/index.php`, `app/api.php` | Entrada HTTP e regras da API JSON |
+| `api/index.php`, `app/api.php` | Entrada HTTP, autenticação da API e despacho para `app/routes/` |
+| `app/routes/*.php` | Regras de cada área da API: trens, sensores, rotas, leituras, alertas, relatórios, admin etc. |
 | `app/bootstrap.php` | PDO MySQL, validações e auditoria |
 | `scripts/create_admin.php` | Criação controlada do primeiro Super Admin |
 | `config/local.php` | Credenciais locais fora do Git |

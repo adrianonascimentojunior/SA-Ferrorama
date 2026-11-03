@@ -1,6 +1,6 @@
 # Rotas e regras de negócio
 
-A API está em `app/api.php` e usa as funções de conexão, autenticação e validação de `app/bootstrap.php`. As páginas PHP e o JavaScript em `public/assets/` usam a mesma sessão. O esquema MySQL define 16 tabelas.
+A API entra por `app/api.php`, que usa as funções de conexão, autenticação e validação de `app/bootstrap.php` e encaminha cada rota para o arquivo correspondente em `app/routes/`. As páginas PHP e o JavaScript em `public/assets/` usam a mesma sessão. O esquema MySQL define 16 tabelas.
 
 | Método e rota da API | Página/ação na interface atual | Regra/persistência |
 | --- | --- | --- |

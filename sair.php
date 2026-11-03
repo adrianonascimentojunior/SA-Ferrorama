@@ -10,7 +10,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-if (!isset($_POST['csrf']) || !is_string($_POST['csrf']) || empty($_SESSION['csrf']) || !hash_equals($_SESSION['csrf'], $_POST['csrf'])) {
+$csrfEnviado = $_POST['csrf'] ?? null;
+$csrfValido = is_string($csrfEnviado) && !empty($_SESSION['csrf']) && hash_equals($_SESSION['csrf'], $csrfEnviado);
+if (!$csrfValido) {
     http_response_code(403);
     exit('Token CSRF inválido.');
 }
