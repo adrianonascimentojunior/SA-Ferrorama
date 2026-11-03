@@ -21,7 +21,11 @@ function db(): PDO {
         ]);
         $pdo->exec("SET time_zone = '+00:00'");
         $timeout = (int)($pdo->query("SELECT value FROM app_settings WHERE `key` = 'db_statement_timeout_ms'")->fetchColumn() ?: 5000);
-        $pdo->exec('SET SESSION max_execution_time = ' . max(1000, min(30000, $timeout)));
+        try {
+            $pdo->exec('SET SESSION max_execution_time = ' . max(1000, min(30000, $timeout)));
+        } catch (PDOException $exception) {
+            error_log($exception->getMessage());
+        }
     }
     return $pdo;
 }
