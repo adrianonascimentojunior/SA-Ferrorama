@@ -9,7 +9,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
         'httponly' => true,
         'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
         'samesite' => 'Lax',
-        'path' => '/SA-Ferroama/',
+        'path' => '/SA-Ferrorama-main/',
     ]);
     session_start();
 }

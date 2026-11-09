@@ -21,7 +21,7 @@ if (!origemPermitida()) {
 
 $method = $_SERVER['REQUEST_METHOD'];
 $path = trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?: '/', '/');
-$path = preg_replace('#^SA-Ferroama/api/?#', '', $path);
+$path = preg_replace('#^SA-Ferrorama-main/api/?#', '', $path);
 $segments = $path === '' ? [] : explode('/', $path);
 
 if ($method === 'OPTIONS') {

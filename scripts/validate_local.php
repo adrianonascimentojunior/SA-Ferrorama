@@ -88,7 +88,7 @@ final class HttpTestClient
     }
 }
 
-$base = rtrim(getenv('ATRAIN_TEST_BASE_URL') ?: 'http://127.0.0.1:8888/SA-Ferroama/', '/') . '/';
+$base = rtrim(getenv('ATRAIN_TEST_BASE_URL') ?: 'http://127.0.0.1:8888/SA-Ferrorama-main/', '/') . '/';
 $checks = 0;
 function verify(bool $condition, string $label): void
 {

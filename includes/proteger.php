@@ -13,7 +13,7 @@ try {
 }
 
 if (!$user) {
-    header('Location: /SA-Ferroama/index.php?page=login', true, 302);
+    header('Location: /SA-Ferrorama-main/index.php?page=login', true, 302);
     exit;
 }
 

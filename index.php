@@ -9,7 +9,7 @@ function h(string $value): string {
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
-$base = '/SA-Ferroama/';
+$base = '/SA-Ferrorama-main/';
 
 $authPages = ['login', 'cadastro', 'recuperar', 'redefinir'];
 $pages = [
