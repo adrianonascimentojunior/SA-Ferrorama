@@ -2,7 +2,7 @@
 
 ## Pré-requisitos
 
-Apache do XAMPP, PHP com `pdo_mysql` e MySQL Server 8.4 em `127.0.0.1:3306`. Configure `config/local.php` a partir de `config/local.example.php` sem versionar a senha. Para testar a instalação do banco em um ambiente vazio, importe `database/schema.mysql.sql` e depois `database/seed.mysql.sql` pelo phpMyAdmin.
+Apache do XAMPP, PHP com `pdo_mysql` e MySQL Server 8.4 em `127.0.0.1:3306`. O `config/local.php` é opcional (padrão XAMPP: `root`, sem senha); use-o, a partir de `config/local.example.php`, apenas para sobrescrever a configuração sem versionar a senha. Para testar a instalação do banco em um ambiente vazio, importe `database/schema.mysql.sql` e depois `database/seed.mysql.sql` pelo phpMyAdmin.
 
 ## Verificações
 

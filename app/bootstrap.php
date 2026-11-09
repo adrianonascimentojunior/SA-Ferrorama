@@ -14,7 +14,7 @@ function db(): PDO {
     static $pdo = null;
     if ($pdo === null) {
         $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4', envv('DB_HOST', 'localhost'), envv('DB_PORT', '3306'), envv('DB_NAME', 'frota_ferroviaria'));
-        $pdo = new PDO($dsn, envv('DB_USER'), envv('DB_PASSWORD'), [
+        $pdo = new PDO($dsn, envv('DB_USER', 'root'), envv('DB_PASSWORD', ''), [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false,
