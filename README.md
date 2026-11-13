@@ -2,22 +2,15 @@
 
 Sistema local de monitoramento ferroviário em PHP 8.2, JavaScript puro e MySQL Server 8.4, servido pelo Apache do XAMPP. Bilhetes, pagamentos, e-mail, push e SMS são simulações explícitas.
 
-### AVISO HUMANOIDE:
+### Acesso rápido (contas de demonstração)
 
-Os únicos trabalhos manuais desse projeto é criar o SUPERADMIN (Admin em geral) e criar o banco de dados (frota_ferroviaria) no phpmyadmin.
-As portas do xampp e outros estão setadas para padrão pelo código.
-Como criar o Admin:
-rode no terminal (powershell):
-$env:ADMIN_EMAIL = "admin@gmail.com" **VOCE DECIDE SUA SENHA e GMAILS ADMIN**
-$env:ADMIN_PASSWORD = "adminsenha"
-cole isso, dê enter, depois rode:
-C:\xampp\php\php.exe scripts\create_admin.php
+O único passo manual é criar o banco `frota_ferroviaria` no phpMyAdmin e importar `database/schema.mysql.sql`. **Nenhum script precisa ser executado**: as 3 contas demo já vêm no próprio `schema.mysql.sql`.
 
-# Se a SA estiver no htdocs, banco estiver criado, XAMPP ligado, portas corretas e admin criado, vai dar certo.
-# Banco:
+Os e-mails e as senhas das contas estão na seção **Contas de demonstração**, no final deste README.
 
-para criar o banco: (database/schema.mysql.sql)
-para popular: (database/seed.mysql.sql) (esse é desnecessário)
+Se a SA estiver em `C:\xampp\htdocs\SA-Ferrorama-main`, o banco estiver importado, o XAMPP ligado e as portas padrão, basta abrir o site e entrar. Os dados de exemplo (`database/seed.mysql.sql`) são opcionais.
+
+> Estas contas existem só para demonstração e usam senhas públicas. Fora de um ambiente de demonstração, desative-as pelo Painel Admin ou use `scripts/create_admin.php` para criar seu próprio Super Admin.
 
 ## Requisitos
 
@@ -29,7 +22,7 @@ Apache, PHP 8.2 com `PDO` e `pdo_mysql`, MySQL Server 8.4 e um navegador. Os ass
 2. Inicie **Apache** e **MySQL** no XAMPP (porta padrão `3306`; em outra porta, crie o `config/local.php` do passo 4). Confirme as extensões PHP `PDO` e `pdo_mysql` com `C:\xampp\php\php.exe -m`.
 3. Em `http://localhost/phpmyadmin`, conecte-se ao MySQL em `127.0.0.1` com uma conta administrativa para instalar o banco. Crie `frota_ferroviaria` com charset `utf8mb4` e collation `utf8mb4_unicode_ci`, e importe [schema.mysql.sql](database/schema.mysql.sql). A importação de [seed.mysql.sql](database/seed.mysql.sql) é opcional e serve apenas para popular dados de exemplo. O esquema da aplicação tem **16 tabelas**.
 4. `config/local.php` é **opcional**: sem ele a aplicação usa o padrão do XAMPP (`root`, sem senha, `localhost:3306`, banco `frota_ferroviaria`). Para outra configuração, copie [local.example.php](config/local.example.php) para `config/local.php` e ajuste host, porta, usuário e senha do MySQL. `local.php` é ignorado pelo Git e bloqueado por HTTP; não grave credenciais no repositório.
-5. Crie o primeiro Super Admin conforme o aviso acima (`scripts/create_admin.php`).
+5. Entre com uma das contas de demonstração listadas no início deste README. Criar um Super Admin próprio com `scripts/create_admin.php` é opcional.
 6. Abra `http://localhost/SA-Ferrorama-main/` (ou com a porta do Apache, como `http://localhost:8080/SA-Ferrorama-main/`). O primeiro acesso vai ao login; cadastros públicos recebem o papel `operator`.
 
 Por padrão a aplicação conecta como `root` sem senha, o padrão do XAMPP. Quem usar uma conta restrita (por exemplo `atrain_app`) deve defini-la no `config/local.php` ou em variáveis de ambiente (`DB_USER`, `DB_PASSWORD`); a conta precisa de permissões de operação nas tabelas, mas não cria o banco nem importa o esquema. Não publique senhas.
@@ -96,3 +89,15 @@ Recuperação de senha exibe o código somente com `APP_ENV=development`. Ele ex
 ## Equipe e contribuição
 
 As responsabilidades de Adriano Nascimento (backend/integração), Nathan T. Pacheco (banco), Erik Felipe (frontend/design) e Gabriel Gonzatto (telas operacionais) estão preservadas em [GIT_EQUIPE.md](docs/GIT_EQUIPE.md) e [CODEOWNERS](.github/CODEOWNERS). Veja [CONTRIBUTING.md](CONTRIBUTING.md) para o fluxo de revisão e validação.
+
+## Contas de demonstração
+
+Já vêm no `database/schema.mysql.sql`; nenhum script precisa ser executado.
+
+| Papel | E-mail | Senha |
+| --- | --- | --- |
+| Super Admin | `admin@atrain.demo` | `Demo@Admin2026` |
+| Gerente | `gerente@atrain.demo` | `Demo@Gerente2026` |
+| Operador | `operador@atrain.demo` | `Demo@Operador2026` |
+
+> Senhas públicas, só para demonstração. Fora desse uso, desative as contas pelo Painel Admin.
