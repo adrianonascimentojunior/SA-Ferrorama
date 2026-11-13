@@ -69,13 +69,8 @@ if ($user && in_array($page, $authPages, true)) {
     exit;
 }
 
-if (in_array($page, ['usuarios', 'admin'], true) && ($user['role'] ?? '') !== 'super_admin') {
-    http_response_code(403);
-    $page = 'sem-acesso';
-}
-
-$paginasDeGestao = ['trens', 'trens_form', 'sensores', 'sensores_form', 'rotas', 'rotas_form', 'simulador'];
-if (in_array($page, $paginasDeGestao, true) && !podeGerenciarCadastros()) {
+// Regra única em includes/permissao.php (PAGINAS_RESTRITAS).
+if (!podeAcessarPagina($page)) {
     http_response_code(403);
     $page = 'sem-acesso';
 }
@@ -87,12 +82,15 @@ $_SESSION['csrf'] ??= bin2hex(random_bytes(32));
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?= h($titles[$page] ?? 'A-Train') ?> · A-Train</title>
-<link rel="stylesheet" href="<?= $base ?>public/assets/css/app.css">
-<link rel="stylesheet" href="<?= $base ?>public/assets/css/local.css">
-<link rel="stylesheet" href="<?= $base ?>public/assets/css/bloco2.css">
-<link rel="stylesheet" href="<?= $base ?>public/assets/css/bloco3.css">
+<link rel="stylesheet" href="<?= $base ?>public/assets/css/app.css?v=<?= (int)@filemtime(__DIR__ . '/public/assets/css/app.css') ?>">
+<link rel="stylesheet" href="<?= $base ?>public/assets/css/local.css?v=<?= (int)@filemtime(__DIR__ . '/public/assets/css/local.css') ?>">
+<link rel="stylesheet" href="<?= $base ?>public/assets/css/bloco2.css?v=<?= (int)@filemtime(__DIR__ . '/public/assets/css/bloco2.css') ?>">
+<link rel="stylesheet" href="<?= $base ?>public/assets/css/bloco3.css?v=<?= (int)@filemtime(__DIR__ . '/public/assets/css/bloco3.css') ?>">
+<link rel="stylesheet" href="<?= $base ?>public/assets/css/navbar.css?v=<?= (int)@filemtime(__DIR__ . '/public/assets/css/navbar.css') ?>">
+<link rel="stylesheet" href="<?= $base ?>public/assets/css/admin.css?v=<?= (int)@filemtime(__DIR__ . '/public/assets/css/admin.css') ?>">
+<link rel="stylesheet" href="<?= $base ?>public/assets/css/mapa.css?v=<?= (int)@filemtime(__DIR__ . '/public/assets/css/mapa.css') ?>">
 </head>
-<body data-page="<?= h($page) ?>" data-base="<?= h($base) ?>" data-csrf="<?= h($_SESSION['csrf']) ?>" data-user="<?= h(json_encode($user, JSON_UNESCAPED_UNICODE) ?: 'null') ?>">
+<body data-page="<?= h($page) ?>" data-base="<?= h($base) ?>" data-csrf="<?= h($_SESSION['csrf']) ?>" data-user="<?= h(json_encode($user, JSON_UNESCAPED_UNICODE) ?: 'null') ?>" data-restricted="<?= h(json_encode(PAGINAS_RESTRITAS)) ?>">
 <?php if (in_array($page, $authPages, true)): ?>
 <div class="auth-layout">
     <aside class="auth-aside">
@@ -126,7 +124,8 @@ $_SESSION['csrf'] ??= bin2hex(random_bytes(32));
 </div>
 </div>
 <?php endif; ?>
-<script src="<?= $base ?>public/assets/js/bloco3.js" defer></script>
-<script src="<?= $base ?>public/assets/js/app.js" defer></script>
+<script src="<?= $base ?>public/assets/js/bloco3.js?v=<?= (int)@filemtime(__DIR__ . '/public/assets/js/bloco3.js') ?>" defer></script>
+<script src="<?= $base ?>public/assets/js/app.js?v=<?= (int)@filemtime(__DIR__ . '/public/assets/js/app.js') ?>" defer></script>
+<script src="<?= $base ?>public/assets/js/navbar.js?v=<?= (int)@filemtime(__DIR__ . '/public/assets/js/navbar.js') ?>" defer></script>
 </body>
 </html>
