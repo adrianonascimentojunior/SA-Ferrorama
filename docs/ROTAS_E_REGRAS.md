@@ -45,3 +45,18 @@ Todas as mutações autenticadas exigem CSRF no backend. Rotas e simulador exige
 | Administração | usuários, frota, sensores, manutenções, alertas, parâmetros e auditoria |
 
 Veja [VALIDACAO.md](VALIDACAO.md) e `scripts/validate_local.php` para a validação HTTP reproduzível. Pagamentos e integrações de comunicação são simulações.
+
+## O que cada ação do Painel Admin grava no banco
+
+Somente as colunas alteradas são gravadas. Cada gravação gera uma linha em `audit_logs` com `{coluna: {before, after}}`, exibida em Painel Admin → Auditoria.
+
+| Ação | Tabela | Colunas gravadas |
+|---|---|---|
+| Editar usuário | `users` | `name`, `job_title`, `role`, `status`, `updated_at` |
+| Editar trem | `trains` | `name`, `status`, `capacity_tons`, `latitude`, `longitude`, `station_id`, `updated_at` |
+| Editar sensor | `sensors` | `status`, `updated_at` |
+| Editar manutenção | `maintenances` | `status`, `notes`, `scheduled_at`, `updated_at` |
+| Editar alerta | `alerts` | `status`, `severity`, `message`, `resolved_at` (derivado do status) |
+| Configuração | `app_settings` | `value` (`maintenance_mode`, `db_statement_timeout_ms`, `alert_retention_days`) |
+
+Endpoints de leitura: `GET /admin/access` (matriz de permissões, fonte em `includes/permissao.php`) e `GET /admin/system` (conexão e contagem de linhas por tabela).
