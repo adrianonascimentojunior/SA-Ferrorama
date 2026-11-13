@@ -62,10 +62,47 @@ async function dashboard() {
   app.querySelector('[name=period]').onchange=e=>{state.period=e.target.value;dashboard();};
 }
 function mapView(map) {
-  const xs=[...map.stations,...map.trains].map(x=>Number(x.longitude)).filter(Number.isFinite), ys=[...map.stations,...map.trains].map(x=>Number(x.latitude)).filter(Number.isFinite);
-  const minX=Math.min(...xs)-.15,maxX=Math.max(...xs)+.15,minY=Math.min(...ys)-.15,maxY=Math.max(...ys)+.15;
-  const pos=x=>[40+(Number(x.longitude)-minX)/(maxX-minX)*620,300-(Number(x.latitude)-minY)/(maxY-minY)*260];
-  return `<div class="map-box"><svg viewBox="0 0 700 340" role="img" aria-label="Mapa esquemático de estações e trens"><polyline points="${map.stations.map(x=>pos(x).join(',')).join(' ')}" fill="none" stroke="#ad8bcf" stroke-width="5" stroke-dasharray="8 7"/>${map.stations.map(x=>{const [px,py]=pos(x);return `<g><circle cx="${px}" cy="${py}" r="8" fill="#6b30ad"/><text x="${px+10}" y="${py-10}">${esc(x.name)}</text></g>`}).join('')}${map.trains.filter(x=>x.latitude&&x.longitude).map(x=>{const [px,py]=pos(x);return `<g><circle cx="${px}" cy="${py}" r="6" fill="#f4a340"/><title>${esc(x.code)} · ${esc(x.status)}</title></g>`}).join('')}</svg></div><p class="data-note">Posições baseadas nas coordenadas cadastradas; não representam GPS contínuo.</p>`;
+  const ok = o => o.latitude != null && o.longitude != null && o.latitude !== '' && Number.isFinite(Number(o.latitude)) && Number.isFinite(Number(o.longitude));
+  const stations = (map.stations || []).filter(ok), trains = (map.trains || []).filter(ok);
+  if (!stations.length && !trains.length) return empty('Nenhuma estação ou trem com coordenadas cadastradas.');
+  const W = 800, H = 440, P = 78, all = [...stations, ...trains];
+  const meanLat = all.reduce((a, o) => a + Number(o.latitude), 0) / all.length;
+  const k = Math.cos(meanLat * Math.PI / 180);
+  const gx = o => Number(o.longitude) * k, gy = o => -Number(o.latitude);
+  const xs = all.map(gx), ys = all.map(gy);
+  const minX = Math.min(...xs), minY = Math.min(...ys);
+  const spanX = Math.max(Math.max(...xs) - minX, .02), spanY = Math.max(Math.max(...ys) - minY, .02);
+  const scale = Math.min((W - 2 * P) / spanX, (H - 2 * P) / spanY);
+  const offX = (W - spanX * scale) / 2, offY = (H - spanY * scale) / 2;
+  const pos = o => [offX + (gx(o) - minX) * scale, offY + (gy(o) - minY) * scale];
+  // Linha: encadeia as estações pelo vizinho mais próximo, partindo da mais a oeste
+  const left = [...stations].sort((a, b) => Number(a.longitude) - Number(b.longitude));
+  const chain = left.length ? [left.shift()] : [];
+  while (left.length) {
+    const [cx, cy] = pos(chain[chain.length - 1]);
+    left.sort((a, b) => Math.hypot(pos(a)[0] - cx, pos(a)[1] - cy) - Math.hypot(pos(b)[0] - cx, pos(b)[1] - cy));
+    chain.push(left.shift());
+  }
+  const track = chain.map(s => pos(s).map(n => n.toFixed(1)).join(',')).join(' ');
+  const st = { operating: ['Operando', '#34d399'], maintenance: ['Manutenção', '#fbbf24'], stopped: ['Parado', '#f87171'], inactive: ['Inativo', '#94a3b8'] };
+  const stationSvg = stations.map(s => {
+    const [x, y] = pos(s), w = String(s.name).length * 6.8 + 20, flip = x > W * .68, rx = flip ? x - 16 - w : x + 16;
+    return `<g class="tm-station"><circle class="tm-halo" cx="${x}" cy="${y}" r="15"/><circle class="tm-dot" cx="${x}" cy="${y}" r="7"/><rect class="tm-label-bg" x="${rx}" y="${y - 12}" width="${w}" height="24" rx="12"/><text class="tm-label" x="${rx + w / 2}" y="${y + 4}" text-anchor="middle">${esc(s.name)}</text></g>`;
+  }).join('');
+  const used = {};
+  const trainSvg = trains.map(t => {
+    let [x, y] = pos(t);
+    const near = stations.some(s => Math.hypot(pos(s)[0] - x, pos(s)[1] - y) < 18);
+    const key = Math.round(x / 14) + ':' + Math.round(y / 14), n = used[key] = (used[key] ?? -1) + 1;
+    if (near) y -= 28; x += n * 24;
+    const [label, color] = st[t.status] || [t.status, '#94a3b8'];
+    const text = `${t.code} · ${label}`, w = text.length * 6.6 + 20, below = y < 62, ty = below ? y + 16 : y - 16 - 26;
+    const tx = Math.min(Math.max(x - w / 2, 6), W - w - 6);
+    return `<g class="tm-train" tabindex="0" style="--c:${color}"><circle class="tm-pulse" cx="${x}" cy="${y}" r="10"/><circle class="tm-core" cx="${x}" cy="${y}" r="8.5"/><path class="tm-glyph" d="M${x - 3.2} ${y - 3.5}h6.4v5.2h-6.4z M${x - 3.2} ${y - .4}h6.4 M${x - 2.4} ${y + 4.4}l1-2.7 M${x + 2.4} ${y + 4.4}l-1-2.7"/><g class="tm-tip"><rect x="${tx}" y="${ty}" width="${w}" height="26" rx="8"/><text x="${tx + w / 2}" y="${ty + 17}" text-anchor="middle">${esc(text)}</text></g></g>`;
+  }).join('');
+  const counts = Object.entries(st).map(([k2, [label, color]]) => [label, color, trains.filter(t => t.status === k2).length]).filter(c => c[2]);
+  const legend = `<li><i class="tm-sw station"></i>${stations.length} estações</li>` + counts.map(([l, c, n]) => `<li><i class="tm-sw" style="--c:${c}"></i>${n} ${esc(l.toLowerCase())}</li>`).join('');
+  return `<div class="tm-map"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Mapa esquemático de estações e trens"><defs><pattern id="tm-grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#fff" stroke-opacity=".05"/></pattern><radialGradient id="tm-glow" cx="50%" cy="45%" r="65%"><stop offset="0" stop-color="#7c3aed" stop-opacity=".35"/><stop offset="1" stop-color="#7c3aed" stop-opacity="0"/></radialGradient></defs><rect width="${W}" height="${H}" fill="url(#tm-grid)"/><rect width="${W}" height="${H}" fill="url(#tm-glow)"/>${chain.length > 1 ? `<polyline class="tm-rail" points="${track}"/><polyline class="tm-sleepers" points="${track}"/><polyline class="tm-flow" points="${track}"/>` : ''}${stationSvg}${trainSvg}</svg></div><ul class="tm-legend">${legend}</ul><p class="data-note">Posições baseadas nas coordenadas cadastradas; não representam GPS contínuo.</p>`;
 }
 async function mapPage() {
   const d = await api('map');
@@ -278,7 +315,7 @@ async function profile() {
   const d = await api('profile');
   app.innerHTML = head('Meu perfil', 'Dados da sua conta e função na operação.') +
     card('Informações da conta',
-      `<p><strong>${esc(d.name)}</strong><br>${esc(d.email)}<br>${statusBadge(d.role)} ${statusBadge(d.status)}<br>Criado em ${date(d.created_at)}</p><form id="profile-form" class="form-stack narrow">${field('Nome','name',d.name,'text','required maxlength="120"')}${field('Cargo','job_title',d.job_title,'text','required maxlength="120"')}<button class="button primary">Salvar perfil</button></form>`
+      `<p><strong>${esc(d.name)}</strong><br>${esc(d.email)}<br>${statusBadge((roleOptions.find(r=>r[0]===d.role)||[])[1]||d.role)} ${statusBadge(d.status)}<br><small>${({operator:'Consulta painel, alertas, leituras e relatórios.',manager:'Consulta tudo e gerencia trens, sensores, rotas e simulador.',super_admin:'Acesso total, incluindo Painel Admin, usuários e configurações do sistema.'})[d.role]||''}</small><br>Criado em ${date(d.created_at)}</p><form id="profile-form" class="form-stack narrow">${field('Nome','name',d.name,'text','required maxlength="120"')}${field('Cargo','job_title',d.job_title,'text','required maxlength="120"')}<button class="button primary">Salvar perfil</button></form>`
     );
   onForm('profile-form', async v => {
     await api('profile', 'PATCH', v);
@@ -342,77 +379,240 @@ async function help() {
     notice('Solicitação registrada.');
   });
 }
-const adminFields={
- users:[['name','Nome'],['job_title','Cargo'],['role','Papel',roleOptions],['status','Status',[['active','Ativo'],['disabled','Desativado'],['banned','Banido']]]],
- trains:[['name','Nome'],['status','Status',statuses],['capacity','Capacidade',null,'number'],['latitude','Latitude',null,'number'],['longitude','Longitude',null,'number'],['station_id','ID da estação',null,'number']],
- sensors:[['status','Status',[['active','Ativo'],['warning','Aviso'],['offline','Offline']]]],
- maintenances:[['status','Status',[['pending','Pendente'],['in_progress','Em andamento'],['completed','Concluída'],['cancelled','Cancelada']]],['notes','Observações'],['scheduled_at','Data programada',null,'datetime-local']],
- alerts:[['status','Status',[['active','Ativo'],['resolved','Resolvido']]],['severity','Severidade',[['critical','Crítico'],['warning','Aviso'],['info','Informação'],['system','Sistema']]],['message','Mensagem']]
+/* ===================== PAINEL ADMIN =====================
+   Regra de ouro desta tela: tudo o que é gravado no MySQL aparece escrito como
+   "tabela.coluna: antes → depois" ANTES de salvar (confirmação), DEPOIS de salvar
+   (resultado) e na Auditoria (histórico). Só as colunas alteradas são enviadas. */
+const enumLabels = {
+  role: Object.fromEntries(roleOptions),
+  userStatus: {active:'Ativo',disabled:'Desativado',banned:'Banido'},
+  trainStatus: trainStatusLabels,
+  sensorStatus: {active:'Ativo',warning:'Atenção',offline:'Sem conexão'},
+  maintStatus: {pending:'Pendente',in_progress:'Em andamento',completed:'Concluída',cancelled:'Cancelada'},
+  alertStatus: {active:'Ativo',resolved:'Resolvido'},
+  severity: {critical:'Crítico',warning:'Aviso',info:'Informação',system:'Sistema'}
 };
-let adminEntity='users';
+const adminTables = {users:'users',trains:'trains',sensors:'sensors',maintenances:'maintenances',alerts:'alerts'};
+const adminNames = {users:'Usuários',trains:'Trens',sensors:'Sensores',maintenances:'Manutenções',alerts:'Alertas'};
+const adminStatusLabels = {users:enumLabels.userStatus,trains:enumLabels.trainStatus,sensors:enumLabels.sensorStatus,maintenances:enumLabels.maintStatus,alerts:enumLabels.alertStatus};
+const adminTabs = [['dados','Dados'],['config','Configurações'],['acesso','Acesso por papel'],['banco','Banco e conexão'],['auditoria','Auditoria']];
+const actionLabels = {admin_update:'Edição no Painel Admin',update_setting:'Configuração do sistema'};
+const settingMeta = {
+  maintenance_mode:{label:'Modo de manutenção',kind:'toggle',help:'Quando ligado, Operadores e Gerentes recebem erro 503 em toda a plataforma. Só o Super Admin continua usando.'},
+  db_statement_timeout_ms:{label:'Tempo máximo de consulta ao banco',kind:'number',unit:'ms',min:1000,max:30000,help:'Aplicado como max_execution_time do MySQL a cada requisição.'},
+  alert_retention_days:{label:'Retenção de alertas',kind:'number',unit:'dias',min:7,max:3650,help:'Por quantos dias os alertas são mantidos.'}
+};
+const tableOwners = {users:'Painel Admin / Perfil',trains:'Painel Admin / Gerente',sensors:'Painel Admin / Gerente',routes:'Gerente',maintenances:'Painel Admin',alerts:'Painel Admin / Simulador',app_settings:'Painel Admin',audit_logs:'Automático (somente leitura)',sensor_readings:'Simulador',stations:'Somente leitura',password_resets:'Recuperação de senha',notification_reads:'Notificações',notification_preferences:'Notificações',schedules:'Somente leitura',ticket_simulations:'Simulador de bilhetes',support_requests:'Ajuda e suporte'};
+let adminEntity='users', adminTab='dados';
+
+const rawTime = v => v ? new Date(String(v).replace(' ','T')+(String(v).includes('Z')?'':'Z')) : null;
+function canon(k,v) { // forma canônica só para comparar "valor salvo" x "valor do formulário"
+  if (v===null || v===undefined || v==='') return '';
+  if (k==='scheduled_at') { const d=rawTime(v); return d && !isNaN(d) ? d.toISOString().slice(0,19) : String(v); }
+  if (['capacity_tons','latitude','longitude'].includes(k)) return String(Number(v));
+  if (k==='station_id') return String(Number(v));
+  return String(v);
+}
+function adminFieldDefs(entity, stations) {
+  const T = adminTables[entity];
+  const defs = {
+    users:[['name','Nome'],['job_title','Cargo'],['role','Papel',roleOptions],['status','Status',Object.entries(enumLabels.userStatus)]],
+    trains:[['name','Modelo / nome'],['status','Status',statuses],['capacity_tons','Capacidade (toneladas)',null,'number','0.01'],['latitude','Latitude',null,'number','any'],['longitude','Longitude',null,'number','any'],['station_id','Estação atual',[['','Nenhuma'],...stations.map(s=>[s.id,s.name])]]],
+    sensors:[['status','Status',Object.entries(enumLabels.sensorStatus)]],
+    maintenances:[['status','Status',Object.entries(enumLabels.maintStatus)],['notes','Observações',null,'textarea'],['scheduled_at','Data programada',null,'datetime-local']],
+    alerts:[['status','Status',Object.entries(enumLabels.alertStatus)],['severity','Severidade',Object.entries(enumLabels.severity)],['message','Mensagem',null,'textarea']]
+  }[entity];
+  return defs.map(([key,label,opts,type,step])=>({key,label,opts,type:type||'text',step,column:`${T}.${key}`}));
+}
+function adminFmt(entity, key, v, ctx) { // valor legível para o usuário
+  if (v===null || v===undefined || v==='') return '—';
+  if (key==='role') return enumLabels.role[v]||v;
+  if (key==='severity') return enumLabels.severity[v]||v;
+  if (key==='status') return (adminStatusLabels[entity]||{})[v]||v;
+  if (key==='station_id') return ctx.stations.find(s=>s.id==v)?.name||`estação #${v}`;
+  if (key==='scheduled_at') return date(v);
+  if (key==='capacity_tons') return `${v} t`;
+  return String(v);
+}
+function changesList(entity, id, changes, ctx) {
+  return `<ul class="change-list">${changes.map(c=>`<li><code>${esc(adminTables[entity]||entity)}.${esc(c.field)}</code> <span class="chg-before">${esc(adminFmt(entity,c.field,c.before,ctx))}</span> <b>→</b> <span class="chg-after">${esc(adminFmt(entity,c.field,c.after,ctx))}</span></li>`).join('')}</ul>`;
+}
+function dbBanner(text) { return `<div class="db-banner"><strong>Banco de dados</strong><span>${text}</span></div>`; }
+
 async function admin() {
-  const users = await api('users');
-  const overview = await api('admin/overview');
-  const [trains, sensors, settings] = await Promise.all([api('trains'), api('sensors'), api('admin/settings')]);
-  const groups = { users, trains, sensors, maintenances: overview.maintenances, alerts: overview.alerts_list };
-  if (page === 'usuarios') adminEntity = 'users';
-  const names = { users: 'Usuários', trains: 'Trens', sensors: 'Sensores', maintenances: 'Manutenções', alerts: 'Alertas' };
+  const onlyUsers = page==='usuarios';
+  if (onlyUsers) { adminEntity='users'; adminTab='dados'; }
+  const [users, overview, map] = await Promise.all([api('users'), api('admin/overview'), api('map')]);
+  const ctx = {stations: map.stations};
   app.innerHTML = head(
-      page === 'usuarios' ? 'Gestão de usuários' : 'Centro de administração',
-      'Ações restritas ao Super Admin e registradas em auditoria.'
+      onlyUsers ? 'Gestão de usuários' : 'Painel Admin',
+      onlyUsers ? 'Altere papel e status de contas. Cada alteração é gravada na tabela users e registrada na auditoria.' : 'Área exclusiva do Super Admin. Tudo que você salvar aqui é gravado no MySQL e fica registrado na aba Auditoria.'
     ) +
     `<div class="metrics-grid">${[['Usuários',overview.users],['Trens',overview.trains],['Sensores',overview.sensors],['Alertas ativos',overview.alerts]].map(([k,v])=>`<div class="card metric-card"><span>${k}</span><strong>${num(v)}</strong></div>`).join('')}</div>` +
-    `<div class="admin-tabs toolbar">${Object.entries(names).filter(([k])=>page!=='usuarios'||k==='users').map(([k,v])=>`<button class="button ${k===adminEntity?'primary':'secondary'}" data-entity="${k}">${v}</button>`).join('')}</div>` +
-    card(names[adminEntity], table(['ID', 'Identificação', 'Estado', 'Ação'], groups[adminEntity].map(x =>
-      `<tr><td>${x.id}</td><td>${esc(x.name||x.code||x.title||x.subject||'Registro')}</td><td>${statusBadge(x.status||x.role||'—')}</td><td><button class="text-link" data-admin-edit="${x.id}">Editar</button></td></tr>`
-    ))) +
-    `<div id="admin-editor"></div>` +
-    (page === 'admin'
-      ? card('Configurações permitidas', settings.map(s =>
-          `<form class="setting-editor" data-setting="${esc(s.key)}"><strong>${esc(s.key)}</strong><small>${esc(s.description)}</small><input name="value" value="${esc(s.value)}" aria-label="Valor de ${esc(s.key)}" required><button class="button secondary">Salvar</button></form>`
-        ).join('')) +
-        card('Atividade recente', table(['Data', 'Autor', 'Ação', 'Entidade'], overview.logs.map(x =>
-          `<tr><td>${date(x.created_at)}</td><td>${esc(x.actor_name||'Sistema')}</td><td>${esc(x.action)}</td><td>${esc(x.entity)} #${esc(x.entity_id||'—')}</td></tr>`
-        )))
-      : '');
-  app.querySelectorAll('[data-entity]').forEach(b => b.onclick = () => { adminEntity = b.dataset.entity; admin(); });
-  app.querySelectorAll('[data-admin-edit]').forEach(b => b.onclick = () =>
-    adminEdit(adminEntity, groups[adminEntity].find(x => x.id == b.dataset.adminEdit))
-  );
-  app.querySelectorAll('[data-setting]').forEach(f => f.onsubmit = async e => {
-    e.preventDefault();
-    try {
-      await api('admin/settings', 'PATCH', { key: f.dataset.setting, value: f.elements.value.value });
-      notice('Configuração salva e auditada.');
-    } catch (err) {
-      notice(err.message, true);
-    }
-  });
+    (onlyUsers ? '' : `<div class="admin-tabs toolbar" role="tablist">${adminTabs.map(([k,v])=>`<button class="button ${k===adminTab?'primary':'secondary'}" role="tab" aria-selected="${k===adminTab}" data-admin-tab="${k}">${v}</button>`).join('')}</div>`) +
+    `<div id="admin-body"></div>`;
+  app.querySelectorAll('[data-admin-tab]').forEach(b => b.onclick = () => { state.pauseRefresh=false; adminTab=b.dataset.adminTab; admin(); });
+  const body = document.getElementById('admin-body');
+  if (adminTab==='dados') await adminDataTab(body, {users, overview, trains:null, ctx, onlyUsers});
+  else if (adminTab==='config') await adminSettingsTab(body);
+  else if (adminTab==='acesso') await adminAccessTab(body);
+  else if (adminTab==='banco') await adminSystemTab(body);
+  else adminAuditTab(body, overview, ctx);
 }
-function adminEdit(entity, item) {
+
+async function adminDataTab(body, {users, overview, ctx, onlyUsers}) {
+  const [trains, sensors] = await Promise.all([api('trains'), api('sensors')]);
+  const groups = {users, trains, sensors, maintenances: overview.maintenances, alerts: overview.alerts_list};
+  const cols = {
+    users:[['ID',x=>x.id],['Nome',x=>esc(x.name)],['E-mail',x=>esc(x.email)],['Papel',x=>esc(enumLabels.role[x.role]||x.role)],['Status',x=>statusPill('users',x.status)]],
+    trains:[['ID',x=>x.id],['Prefixo',x=>esc(x.code)],['Modelo',x=>esc(x.name)],['Status',x=>statusPill('trains',x.status)],['Estação',x=>esc(x.station_name||'—')]],
+    sensors:[['ID',x=>x.id],['Código',x=>esc(x.code)],['Tipo',x=>esc(x.type)],['Trem',x=>esc(x.train_code)],['Status',x=>statusPill('sensors',x.status)]],
+    maintenances:[['ID',x=>x.id],['Trem',x=>esc(x.train_code)],['Título',x=>esc(x.title)],['Programada',x=>date(x.scheduled_at)],['Status',x=>statusPill('maintenances',x.status)]],
+    alerts:[['ID',x=>x.id],['Título',x=>esc(x.title)],['Severidade',x=>esc(enumLabels.severity[x.severity]||x.severity)],['Status',x=>statusPill('alerts',x.status)]]
+  };
+  const entities = onlyUsers ? ['users'] : Object.keys(adminNames);
+  const c = cols[adminEntity];
+  body.innerHTML =
+    (onlyUsers ? '' : `<div class="admin-tabs toolbar">${entities.map(k=>`<button class="button ${k===adminEntity?'primary':'secondary'}" data-entity="${k}">${adminNames[k]}</button>`).join('')}</div>`) +
+    dbBanner(`Editar um registro abaixo altera a tabela <code>${adminTables[adminEntity]}</code>. Campos editáveis: ${adminFieldDefs(adminEntity, ctx.stations).map(f=>`<code>${f.key}</code>`).join(', ')}. Os demais campos são somente leitura.`) +
+    card(adminNames[adminEntity], managementTable([...c.map(x=>x[0]),'Ação'], groups[adminEntity].map(x => [...c.map(([,fn])=>fn(x)), `<button class="text-link" data-admin-edit="${x.id}">Editar</button>`])), `<span class="table-tag">tabela ${adminTables[adminEntity]}</span>`) +
+    `<div id="admin-editor"></div>`;
+  body.querySelectorAll('[data-entity]').forEach(b => b.onclick = () => { state.pauseRefresh=false; adminEntity=b.dataset.entity; admin(); });
+  body.querySelectorAll('[data-admin-edit]').forEach(b => b.onclick = () =>
+    adminEdit(adminEntity, groups[adminEntity].find(x => x.id == b.dataset.adminEdit), ctx)
+  );
+}
+function statusPill(entity, v) {
+  const tone = {operating:'normal',active:'normal',completed:'normal',resolved:'normal',maintenance:'attention',warning:'attention',pending:'attention',in_progress:'attention',stopped:'critical',inactive:'critical',offline:'critical',disabled:'critical',banned:'critical',cancelled:'critical'}[v]||'normal';
+  return managementBadge((adminStatusLabels[entity]||{})[v]||v||'—', tone);
+}
+
+function adminEdit(entity, item, ctx) {
   state.pauseRefresh = true;
   const panel = document.getElementById('admin-editor');
-  panel.innerHTML = card(`Editar ${entity} #${item.id}`,
-    `<form id="admin-form" class="form-stack"><div class="form-two">${adminFields[entity].map(([k,label,opts,type])=>opts?select(label,k,opts,item[k]||''):field(label,k,type==='datetime-local'?localDateTimeInput(item[k]):item[k]??'',type||'text',type==='number'?'step="any"':'')).join('')}</div><button class="button primary">Salvar alteração</button><button type="button" class="button secondary" id="cancel-admin">Cancelar</button></form>`
+  const defs = adminFieldDefs(entity, ctx.stations);
+  const who = item.name||item.code||item.title||`#${item.id}`;
+  const input = d => {
+    const cur = d.key==='scheduled_at' ? localDateTimeInput(item[d.key]) : (item[d.key]??'');
+    const hint = `<small class="col-hint">grava em <code>${esc(d.column)}</code></small>`;
+    if (d.opts) return `<label class="field"><span>${esc(d.label)}</span><select name="${d.key}">${d.opts.map(([v,t])=>`<option value="${esc(v)}" ${String(v)===String(cur)?'selected':''}>${esc(t)}</option>`).join('')}</select>${hint}</label>`;
+    if (d.type==='textarea') return `<label class="field"><span>${esc(d.label)}</span><textarea name="${d.key}" rows="3" maxlength="3000">${esc(cur)}</textarea>${hint}</label>`;
+    return `<label class="field"><span>${esc(d.label)}</span><input name="${d.key}" type="${d.type}" value="${esc(cur)}" ${d.type==='number'?`step="${d.step||'any'}"`:''}>${hint}</label>`;
+  };
+  panel.innerHTML = card(`Editando ${adminNames[entity].toLowerCase()} · ${who}`,
+    `<p class="data-note">Registro <code>${adminTables[entity]}</code> id ${item.id}. Altere o que precisar: só as colunas modificadas serão gravadas.</p>
+     <form id="admin-form" class="form-stack"><div class="form-two">${defs.map(input).join('')}</div>
+     <div class="toolbar"><button class="button primary">Revisar alterações</button><button type="button" class="button secondary" id="cancel-admin">Cancelar</button></div></form><div id="admin-review"></div>`
   );
   panel.scrollIntoView({ behavior: 'smooth' });
-  document.getElementById('cancel-admin').onclick = () => { state.pauseRefresh = false; panel.innerHTML = ''; };
-  onForm('admin-form', async d => {
-    for (const [k, , , type] of adminFields[entity]) {
-      if (type === 'number') d[k] = d[k] === '' ? null : Number(d[k]);
-      if (type === 'datetime-local') d[k] = new Date(d[k]).toISOString().slice(0, 19).replace('T', ' ');
+  const close = () => { state.pauseRefresh = false; panel.innerHTML = ''; };
+  document.getElementById('cancel-admin').onclick = close;
+  onForm('admin-form', async (d, form) => {
+    const payload = {}, changes = [];
+    for (const f of defs) {
+      let v = d[f.key] ?? '';
+      if (f.key==='scheduled_at') {
+        if (!v) throw Error('Informe a data programada.');
+        v = new Date(v).toISOString().slice(0,19).replace('T',' ');
+      } else if (f.type==='number') v = v==='' ? null : Number(v);
+      else if (f.key==='station_id') v = v==='' ? null : Number(v);
+      if (canon(f.key, v) === canon(f.key, item[f.key])) continue;
+      payload[f.key] = v;
+      changes.push({field:f.key, before:item[f.key]??null, after:v});
     }
-    await api(`admin/${entity}/${item.id}`, 'PATCH', d);
-    state.pauseRefresh = false;
-    await admin();
-    notice('Alteração salva e auditada.');
+    const review = document.getElementById('admin-review');
+    if (!changes.length) { review.innerHTML = `<p class="empty-state">Nada foi alterado. Nenhuma gravação será feita no banco.</p>`; return; }
+    review.innerHTML = `<div class="review-box"><h3>Confirme o que será gravado no banco</h3><p class="data-note">Tabela <code>${adminTables[entity]}</code>, registro id ${item.id}:</p>${changesList(entity,item.id,changes,ctx)}<div class="toolbar"><button class="button primary" id="confirm-admin">Confirmar e gravar</button><button class="button secondary" id="back-admin" type="button">Voltar</button></div></div>`;
+    document.getElementById('back-admin').onclick = () => { review.innerHTML = ''; };
+    document.getElementById('confirm-admin').onclick = async e => {
+      e.target.disabled = true;
+      try {
+        const r = await api(`admin/${entity}/${item.id}`, 'PATCH', payload);
+        state.pauseRefresh = false;
+        await admin();
+        showSaved(r, entity, ctx);
+      } catch (err) { e.target.disabled = false; notice(err.message, true); }
+    };
   });
 }
+function showSaved(r, entity, ctx) {
+  const el = document.getElementById('notice'); if (!el) return;
+  if (!r.changes?.length) { notice(r.message); return; }
+  el.className = 'notice success';
+  el.innerHTML = `<strong>${esc(r.message)}</strong> Gravado em <code>${esc(r.table)}</code>${r.id?` (id ${r.id})`:''}:${changesList(entity, r.id, r.changes, ctx)}`;
+  el.hidden = false;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+async function adminSettingsTab(body) {
+  const settings = await api('admin/settings');
+  const ctx = {stations:[]};
+  body.innerHTML = dbBanner('Cada configuração abaixo é uma linha da tabela <code>app_settings</code>. Ao salvar, o valor muda imediatamente para todos os usuários.') +
+    card('Configurações do sistema', settings.filter(s=>settingMeta[s.key]).map(s => {
+      const m = settingMeta[s.key];
+      if (m.kind==='toggle') {
+        const on = s.value==='true';
+        return `<form class="setting-editor" data-setting="${esc(s.key)}" data-kind="toggle"><div><strong>${m.label}</strong><small>${m.help}</small><small class="col-hint"><code>app_settings.${esc(s.key)}</code> · valor atual: <b>${on?'ligado':'desligado'}</b></small></div><label class="check"><input type="checkbox" name="value" ${on?'checked':''}> ${on?'Ligado':'Desligado'}</label><button class="button secondary">Salvar</button></form>`;
+      }
+      return `<form class="setting-editor" data-setting="${esc(s.key)}" data-kind="number"><div><strong>${m.label}</strong><small>${m.help}</small><small class="col-hint"><code>app_settings.${esc(s.key)}</code> · valor atual: <b>${esc(s.value)} ${m.unit}</b> · permitido ${num(m.min)} a ${num(m.max)}</small></div><span class="unit-input"><input name="value" type="number" min="${m.min}" max="${m.max}" step="1" value="${esc(s.value)}" aria-label="${m.label}" required> ${m.unit}</span><button class="button secondary">Salvar</button></form>`;
+    }).join('') || empty());
+  body.querySelectorAll('[data-setting]').forEach(f => f.onsubmit = async e => {
+    e.preventDefault();
+    const key = f.dataset.setting, toggle = f.dataset.kind==='toggle';
+    const value = toggle ? String(f.elements.value.checked) : f.elements.value.value;
+    if (key==='maintenance_mode' && value==='true' && !confirm('Ligar o modo de manutenção bloqueia Operadores e Gerentes em toda a plataforma. Só o Super Admin continua com acesso. Confirmar?')) return;
+    try {
+      const r = await api('admin/settings', 'PATCH', {key, value});
+      await admin();
+      const el = document.getElementById('notice');
+      if (el && r.changes?.length) {
+        el.className='notice success'; el.hidden=false;
+        const c = r.changes[0], m = settingMeta[key];
+        const fmt = v => key==='maintenance_mode' ? (v==='true'?'ligado':'desligado') : `${v} ${m.unit}`;
+        el.innerHTML = `<strong>${esc(r.message)}</strong> <code>app_settings.${esc(key)}</code>: <span class="chg-before">${esc(fmt(c.before))}</span> <b>→</b> <span class="chg-after">${esc(fmt(c.after))}</span>`;
+      } else notice(r.message);
+    } catch (err) { notice(err.message, true); }
+  });
+}
+
+async function adminAccessTab(body) {
+  const a = await api('admin/access');
+  const roles = Object.entries(a.roles);
+  body.innerHTML = dbBanner('Esta aba é somente leitura: mostra o que cada papel pode fazer e quais tabelas cada ação altera. Para mudar o papel de alguém, use Dados → Usuários.') +
+    card('Acesso por papel', `<div class="table-wrap"><table class="access-table"><thead><tr><th>O que a pessoa pode fazer</th>${roles.map(([k,v])=>`<th class="${k===a.current_role?'is-me':''}">${esc(v)}${k===a.current_role?' <small>(você)</small>':''}</th>`).join('')}<th>Tabelas afetadas</th></tr></thead><tbody>${a.matrix.map(([cap,nota,papeis,tabelas])=>`<tr><td><strong>${esc(cap)}</strong><br><small>${esc(nota)}</small></td>${roles.map(([k])=>`<td class="${papeis.includes(k)?'yes':'no'}" aria-label="${papeis.includes(k)?'Permitido':'Sem acesso'}">${papeis.includes(k)?'✔':'—'}</td>`).join('')}<td><code>${esc(tabelas)}</code></td></tr>`).join('')}</tbody></table></div>`) +
+    `<p class="data-note">As regras vêm de <code>includes/permissao.php</code> (menu e páginas) e são reforçadas na API: nenhuma tela substitui a checagem do servidor.</p>`;
+}
+
+async function adminSystemTab(body) {
+  const s = await api('admin/system');
+  const d = s.database;
+  const rows = [['Status da conexão', d.connected ? managementBadge('Conectado','normal') : managementBadge('Sem conexão','critical')],['Servidor MySQL', `<code>${esc(d.host)}</code>`],['Banco', `<code>${esc(d.name)}</code>`],['Usuário do banco', `<code>${esc(d.user)}</code> <small>(a senha nunca é exibida)</small>`],['Versão do MySQL', esc(d.version)],['Fuso do banco', esc(d.timezone)+' (a tela converte para o seu fuso)'],['Ambiente', esc(s.environment)],['Modo de manutenção', s.maintenance_mode ? managementBadge('Ligado','attention') : managementBadge('Desligado','normal')],['Hora do servidor (UTC)', date(s.server_time_utc)]];
+  body.innerHTML = dbBanner('Conexão usada pela API (configurada em <code>config/local.php</code> ou variáveis de ambiente). Abaixo, quantas linhas cada tabela tem e quem pode alterá-la.') +
+    card('Conexão com o banco', `<dl class="kv">${rows.map(([k,v])=>`<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>`) +
+    card('Tabelas do banco', managementTable(['Tabela','Linhas','Quem altera'], s.tables.map(t=>[`<code>${esc(t.table)}</code>`, num(t.rows), esc(tableOwners[t.table]||'—')])));
+}
+
+function adminAuditTab(body, overview, ctx) {
+  const parse = v => { try { return typeof v==='string' ? JSON.parse(v) : v; } catch { return null; } };
+  const detail = x => {
+    const d = parse(x.details) || {};
+    const entries = Object.entries(d.changes || {});
+    if (entries.length) return `<ul class="change-list">${entries.map(([f,c])=>`<li><code>${esc(x.entity)}.${esc(f)}</code> <span class="chg-before">${esc(adminFmt(x.entity,f,c.before,ctx))}</span> <b>→</b> <span class="chg-after">${esc(adminFmt(x.entity,f,c.after,ctx))}</span></li>`).join('')}</ul>`;
+    const flat = Object.keys(d).length ? JSON.stringify(d) : '';
+    return flat ? `<small>${esc(flat.length>120?flat.slice(0,120)+'…':flat)}</small>` : '<small>—</small>';
+  };
+  body.innerHTML = dbBanner('Histórico automático de tudo que foi gravado (tabela <code>audit_logs</code>, somente leitura). Mostra as 40 ações mais recentes.') +
+    card('Atividade recente', managementTable(['Data','Quem','Ação','Registro','O que mudou no banco'], overview.logs.map(x=>[
+      date(x.created_at), esc(x.actor_name||'Sistema'), esc(actionLabels[x.action]||x.action), `<code>${esc(x.entity)}${x.entity_id?' #'+esc(x.entity_id):''}</code>`, detail(x)
+    ])));
+}
+
 const routes={dashboard,trens:trains,trens_form:trainFormPage,sensores:sensorsPage,sensores_form:sensorFormPage,rotas:routesPage,rotas_form:routeFormPage,leituras:readingsPage,simulador:simulatorPage,notificacoes_alertas:operationalAlertsPage,alertas:alertsPage,localizacao:mapPage,bilhetes:tickets,relatorios:reports,notificacoes:notifications,perfil:profile,configuracoes:settings,ajuda:help,usuarios:admin,admin};
 async function load() {
   try {
     if (['login', 'cadastro', 'recuperar', 'redefinir'].includes(page)) await auth();
     else if (routes[page]) await routes[page]();
+    else if (page === 'sem-acesso') app.innerHTML = head('Sem acesso', `Seu papel (${(roleOptions.find(r=>r[0]===user?.role)||[])[1]||'—'}) não pode abrir esta página. Peça a um Super Admin para ajustar seu papel.`) + `<a class="button primary" href="${root}">Voltar ao início</a>`;
     else app.innerHTML = head('Página indisponível', 'Confira o endereço ou suas permissões.');
   } catch (e) {
     app.innerHTML = head('Não foi possível carregar', e.message);
@@ -443,11 +643,8 @@ if (routes[page]) {
       const session = await api('auth/me');
       csrf = session.csrf;
       user = session.user;
-      if (['admin', 'usuarios'].includes(page) && user.role !== 'super_admin') {
-        location.href = root;
-        return;
-      }
-      if (['trens', 'trens_form', 'sensores', 'sensores_form', 'rotas', 'rotas_form', 'simulador'].includes(page) && !['manager', 'super_admin'].includes(user.role)) {
+      const restricted = JSON.parse(document.body.dataset.restricted || '{}');
+      if (restricted[page] && !restricted[page].includes(user.role)) {
         location.href = root;
         return;
       }

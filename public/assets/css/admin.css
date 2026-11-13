@@ -1,0 +1,19 @@
+/* Painel Admin: clareza sobre o que muda no banco */
+.db-banner{display:flex;gap:.75rem;align-items:baseline;flex-wrap:wrap;margin:0 0 1rem;padding:.7rem 1rem;border-left:4px solid #6b30ad;background:#f3ecfa;border-radius:8px;font-size:.9rem}
+.db-banner strong{color:#4a1f78;text-transform:uppercase;font-size:.72rem;letter-spacing:.06em}
+code{font-family:ui-monospace,Consolas,monospace;font-size:.85em;background:rgba(107,48,173,.09);padding:.05em .35em;border-radius:4px}
+.table-tag{font-size:.75rem;color:#6b30ad;background:#f3ecfa;padding:.15rem .5rem;border-radius:999px}
+.col-hint{display:block;color:#6b6b7b;margin-top:.2rem;font-size:.75rem}
+.change-list{list-style:none;margin:.4rem 0;padding:0;display:grid;gap:.3rem}
+.chg-before{background:#fde8e8;color:#9b1c1c;padding:.05em .4em;border-radius:4px;text-decoration:line-through}
+.chg-after{background:#e3f6e8;color:#14612c;padding:.05em .4em;border-radius:4px;font-weight:600}
+.review-box{margin-top:1rem;padding:1rem;border:2px dashed #f4a340;border-radius:10px;background:#fffaf2}
+#notice .change-list{margin:.4rem 0 0}
+.setting-editor{display:grid;grid-template-columns:1fr auto auto;gap:1rem;align-items:center;padding:.9rem 0;border-bottom:1px solid #eee}
+.setting-editor small{display:block;color:#6b6b7b}
+.unit-input input{width:7rem}
+.kv{display:grid;gap:.4rem;margin:0}.kv div{display:grid;grid-template-columns:12rem 1fr;gap:1rem}.kv dt{color:#6b6b7b}.kv dd{margin:0}
+.access-table td.yes{color:#14612c;font-weight:700;text-align:center}
+.access-table td.no{color:#aaa;text-align:center}
+.access-table th.is-me{background:#f3ecfa}
+@media(max-width:700px){.setting-editor{grid-template-columns:1fr}.kv div{grid-template-columns:1fr}}
