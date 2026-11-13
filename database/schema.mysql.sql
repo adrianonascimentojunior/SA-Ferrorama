@@ -9,6 +9,12 @@ CREATE TABLE users (
  CONSTRAINT users_role_check CHECK (role IN ('operator','manager','super_admin')),
  CONSTRAINT users_status_check CHECK (status IN ('active','disabled','banned'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- Contas de demonstração (já vêm prontas; não é preciso rodar script nenhum).
+-- Senhas e papéis estão no README. Troque ou desative estas contas fora de ambiente de demonstração.
+INSERT INTO users (name,email,password_hash,role,job_title) VALUES
+('Admin Demo','admin@atrain.demo','$2y$10$meEJ4AYeZCLmBrfWP0PczOELCmd3Yw9892UfunHNkw/xmFO95mP32','super_admin','Administrador da plataforma'),
+('Gerente Demo','gerente@atrain.demo','$2y$10$QOUf0Aol58g4ltgzW/ZLiOm0Lz9evkuCkYonSMUFZZjZuRm5JayaG','manager','Gerente de operações'),
+('Operador Demo','operador@atrain.demo','$2y$10$ouaPgv5T9LWt7rtkKAMsz..KTWxlODCg5AT8QGD77OE.tfpkLMpOG','operator','Operador ferroviário');
 CREATE TABLE password_resets (
  user_id BIGINT PRIMARY KEY, code_hash TEXT NOT NULL, expires_at DATETIME NOT NULL, attempts SMALLINT NOT NULL DEFAULT 0,
  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
