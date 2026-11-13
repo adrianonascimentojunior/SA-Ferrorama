@@ -4,13 +4,9 @@ Sistema local de monitoramento ferroviário em PHP 8.2, JavaScript puro e MySQL 
 
 ### Acesso rápido (contas de demonstração)
 
-O único passo manual é criar o banco `frota_ferroviaria` no phpMyAdmin e importar `database/schema.mysql.sql`. **Nenhum script precisa ser executado**: as 3 contas abaixo já vêm no próprio `schema.mysql.sql`.
+O único passo manual é criar o banco `frota_ferroviaria` no phpMyAdmin e importar `database/schema.mysql.sql`. **Nenhum script precisa ser executado**: as 3 contas demo já vêm no próprio `schema.mysql.sql`.
 
-| Papel | E-mail | Senha |
-| --- | --- | --- |
-| Super Admin | `admin@atrain.demo` | `Demo@Admin2026` |
-| Gerente | `gerente@atrain.demo` | `Demo@Gerente2026` |
-| Operador | `operador@atrain.demo` | `Demo@Operador2026` |
+Os e-mails e as senhas das contas estão na seção **Contas de demonstração**, no final deste README.
 
 Se a SA estiver em `C:\xampp\htdocs\SA-Ferrorama-main`, o banco estiver importado, o XAMPP ligado e as portas padrão, basta abrir o site e entrar. Os dados de exemplo (`database/seed.mysql.sql`) são opcionais.
 
@@ -93,3 +89,15 @@ Recuperação de senha exibe o código somente com `APP_ENV=development`. Ele ex
 ## Equipe e contribuição
 
 As responsabilidades de Adriano Nascimento (backend/integração), Nathan T. Pacheco (banco), Erik Felipe (frontend/design) e Gabriel Gonzatto (telas operacionais) estão preservadas em [GIT_EQUIPE.md](docs/GIT_EQUIPE.md) e [CODEOWNERS](.github/CODEOWNERS). Veja [CONTRIBUTING.md](CONTRIBUTING.md) para o fluxo de revisão e validação.
+
+## Contas de demonstração
+
+Já vêm no `database/schema.mysql.sql`; nenhum script precisa ser executado.
+
+| Papel | E-mail | Senha |
+| --- | --- | --- |
+| Super Admin | `admin@atrain.demo` | `Demo@Admin2026` |
+| Gerente | `gerente@atrain.demo` | `Demo@Gerente2026` |
+| Operador | `operador@atrain.demo` | `Demo@Operador2026` |
+
+> Senhas públicas, só para demonstração. Fora desse uso, desative as contas pelo Painel Admin.
